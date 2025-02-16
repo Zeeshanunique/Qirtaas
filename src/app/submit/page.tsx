@@ -30,27 +30,46 @@ export default function SubmitPage() {
 
     try {
       const formData = new FormData(e.currentTarget)
-      const file = formData.get('file') as File
+      const manuscriptFile = formData.get('file') as File
+      const coverFile = formData.get('cover') as File
 
-      // Validate file
-      if (!file) {
-        throw new Error('Please select a file to upload')
+      // Validate manuscript file
+      if (!manuscriptFile) {
+        throw new Error('Please select a manuscript file to upload')
       }
 
-      // Check file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        throw new Error('File size exceeds 10MB limit')
+      // Validate cover file
+      if (!coverFile) {
+        throw new Error('Please select a cover image')
       }
 
-      // Check file type
-      const allowedTypes = ['.doc', '.docx', '.pdf']
-      const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
-      if (!allowedTypes.includes(fileExtension)) {
-        throw new Error('Invalid file type. Please upload a DOC, DOCX, or PDF file')
+      // Check manuscript file size (10MB limit)
+      if (manuscriptFile.size > 10 * 1024 * 1024) {
+        throw new Error('Manuscript file size exceeds 10MB limit')
       }
 
-      // Upload file to Google Drive
-      const driveUploadResponse = await axios.post('/api/upload-drive', formData, {
+      // Check cover file size (2MB limit)
+      if (coverFile.size > 2 * 1024 * 1024) {
+        throw new Error('Cover image size exceeds 2MB limit')
+      }
+
+      // Check manuscript file type
+      const allowedManuscriptTypes = ['.doc', '.docx', '.pdf']
+      const manuscriptExtension = manuscriptFile.name.substring(manuscriptFile.name.lastIndexOf('.')).toLowerCase()
+      if (!allowedManuscriptTypes.includes(manuscriptExtension)) {
+        throw new Error('Invalid manuscript file type. Please upload a DOC, DOCX, or PDF file')
+      }
+
+      // Check cover file type
+      const allowedCoverTypes = ['image/jpeg', 'image/png', 'image/jpg']
+      if (!allowedCoverTypes.includes(coverFile.type)) {
+        throw new Error('Invalid cover image type. Please upload a JPG or PNG file')
+      }
+
+      // Upload manuscript to Google Drive
+      const manuscriptFormData = new FormData()
+      manuscriptFormData.append('file', manuscriptFile)
+      const manuscriptUploadResponse = await axios.post('/api/upload-drive', manuscriptFormData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -58,8 +77,23 @@ export default function SubmitPage() {
         maxBodyLength: Infinity,
       })
 
-      if (!driveUploadResponse.data.success) {
-        throw new Error('Failed to upload file to Google Drive')
+      if (!manuscriptUploadResponse.data.success) {
+        throw new Error('Failed to upload manuscript to Google Drive')
+      }
+
+      // Upload cover to Google Drive
+      const coverFormData = new FormData()
+      coverFormData.append('file', coverFile)
+      const coverUploadResponse = await axios.post('/api/upload-drive', coverFormData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      })
+
+      if (!coverUploadResponse.data.success) {
+        throw new Error('Failed to upload cover image to Google Drive')
       }
 
       // Store submission data in Firebase
@@ -69,8 +103,10 @@ export default function SubmitPage() {
         title: formData.get('title'),
         category: formData.get('category'),
         description: formData.get('description'),
-        fileUrl: driveUploadResponse.data.fileUrl,
-        fileId: driveUploadResponse.data.fileId,
+        fileUrl: manuscriptUploadResponse.data.fileUrl,
+        fileId: manuscriptUploadResponse.data.fileId,
+        cover: coverUploadResponse.data.fileUrl,
+        coverId: coverUploadResponse.data.fileId,
         submittedAt: new Date().toISOString(),
         status: 'pending',
         userId: user?.uid,
@@ -166,6 +202,24 @@ export default function SubmitPage() {
             </div>
 
             <div>
+              <label htmlFor="cover" className="block text-sm font-medium text-gray-700">Cover Image</label>
+              <input
+                type="file"
+                id="cover"
+                name="cover"
+                accept="image/jpeg,image/png,image/jpg"
+                className="mt-1 block w-full text-sm text-gray-500
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-md file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-primary file:text-white
+                  hover:file:bg-gray-700"
+                required
+              />
+              <p className="mt-1 text-sm text-gray-500">Accepted formats: JPG, PNG. Max size: 2MB</p>
+            </div>
+
+            <div>
               <label htmlFor="file" className="block text-sm font-medium text-gray-700">Upload Manuscript</label>
               <input
                 type="file"
@@ -217,7 +271,14 @@ export default function SubmitPage() {
             <ul className="list-disc list-inside space-y-2 text-gray-700">
               <li>Ensure your manuscript is properly formatted and edited</li>
               <li>Include a detailed synopsis if submitting a book</li>
-              <li>Maximum file size: 10MB</li>
+              <li>Manuscript file size limit: 10MB</li>
+              <li>Cover image requirements:
+                <ul className="list-disc list-inside ml-4 mt-1">
+                  <li>Format: JPG or PNG</li>
+                  <li>Size limit: 2MB</li>
+                  <li>Recommended dimensions: 1600x2400 pixels</li>
+                </ul>
+              </li>
               <li>Response time: 4-6 weeks</li>
               <li>Please review our terms and conditions before submitting</li>
             </ul>

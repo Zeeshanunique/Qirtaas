@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 
 export default function Home() {
-  const { user, loading } = useAuth()
+  const { user, loading, isAdmin } = useAuth()
 
   const handleSignOut = async () => {
     try {
@@ -18,7 +18,6 @@ export default function Home() {
 
   return (
     <>
-      {/* Hero Section */}
       <section className="bg-gradient-to-r from-primary to-accent text-beige py-20">
         <div className="container mx-auto px-4">
           <div className="flex justify-end mb-4">
@@ -27,6 +26,14 @@ export default function Home() {
             ) : user ? (
               <div className="flex items-center gap-4">
                 <span className="text-beige">{user.email}</span>
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="bg-primary hover:bg-primary/90 text-beige font-bold py-2 px-4 rounded-lg transition duration-300"
+                  >
+                    Admin Dashboard
+                  </Link>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="bg-secondary hover:bg-sand text-accent font-bold py-2 px-4 rounded-lg transition duration-300"
@@ -64,6 +71,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Services Section */}
 
       {/* Services Section */}
       <section className="py-20 bg-beige">

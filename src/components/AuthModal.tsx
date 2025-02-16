@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import { isAdmin } from '@/utils/adminAuth'
+import { useRouter } from 'next/navigation'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -10,6 +12,7 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const router = useRouter()
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,11 +26,16 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password)
+        const userCredential = await signInWithEmailAndPassword(auth, email, password)
+        if (isAdmin(userCredential.user.email)) {
+          router.push('/admin')
+        }
       } else {
         await createUserWithEmailAndPassword(auth, email, password)
       }
       onClose()
+      setEmail('')
+      setPassword('')
     } catch (error: any) {
       setError(error.message)
     } finally {

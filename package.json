@@ -14,6 +14,7 @@
     "autoprefixer": "^10.4.17",
     "axios": "^1.7.9",
     "firebase": "^11.3.1",
+    "firebase-admin": "^13.1.0",
     "googleapis": "^144.0.0",
     "next": "14.1.0",
     "postcss": "^8.4.35",
@@ -27,6 +28,9 @@
   "devDependencies": {
     "@types/node": "^22.13.1",
     "@types/react": "19.0.8",
-    "typescript": "5.7.3"
+    "buffer": "^6.0.3",
+    "process": "^0.11.10",
+    "typescript": "5.7.3",
+    "webpack": "^5.98.0"
   }
 }

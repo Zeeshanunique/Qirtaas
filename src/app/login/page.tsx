@@ -1,14 +1,26 @@
 'use client'
-
+import { doc, setDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 import { useState } from 'react'
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth'
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useRouter } from 'next/navigation'
 
+interface UserDetails {
+  email: string
+  password: string
+  name: string
+  phone: string
+}
+
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [userDetails, setUserDetails] = useState<UserDetails>({
+    email: '',
+    password: '',
+    name: '',
+    phone: '',
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -20,9 +32,23 @@ export default function LoginPage() {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password)
+        await signInWithEmailAndPassword(auth, userDetails.email, userDetails.password)
       } else {
-        await createUserWithEmailAndPassword(auth, email, password)
+        const { user } = await createUserWithEmailAndPassword(
+          auth, 
+          userDetails.email, 
+          userDetails.password
+        )
+        await updateProfile(user, {
+          displayName: userDetails.name
+        })
+        // Store additional user details in Firestore
+        await setDoc(doc(db, 'users', user.uid), {
+          name: userDetails.name,
+          phone: userDetails.phone,
+          email: userDetails.email,
+          createdAt: new Date().toISOString()
+        })
       }
       router.push('/')
     } catch (error: any) {
@@ -47,6 +73,37 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <>
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    id="name"
+                    value={userDetails.name}
+                    onChange={(e) => setUserDetails(prev => ({ ...prev, name: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                    required={!isLogin}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    id="phone"
+                    value={userDetails.phone}
+                    onChange={(e) => setUserDetails(prev => ({ ...prev, phone: e.target.value }))}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                    required={!isLogin}
+                  />
+                </div>
+              </>
+            )}
+            
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email Address
@@ -54,8 +111,8 @@ export default function LoginPage() {
               <input
                 type="email"
                 id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={userDetails.email}
+                onChange={(e) => setUserDetails(prev => ({ ...prev, email: e.target.value }))}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
                 required
               />
@@ -68,8 +125,8 @@ export default function LoginPage() {
               <input
                 type="password"
                 id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={userDetails.password}
+                onChange={(e) => setUserDetails(prev => ({ ...prev, password: e.target.value }))}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
                 required
               />

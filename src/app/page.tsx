@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 
+
 export default function Home() {
   const { user, loading, isAdmin } = useAuth()
 
@@ -25,21 +26,31 @@ export default function Home() {
               <div className="animate-pulse bg-secondary/50 h-10 w-24 rounded-lg"></div>
             ) : user ? (
               <div className="flex items-center gap-4">
-                <span className="text-beige">{user.email}</span>
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="bg-primary hover:bg-primary/90 text-beige font-bold py-2 px-4 rounded-lg transition duration-300"
-                  >
-                    Admin Dashboard
-                  </Link>
-                )}
-                <button
-                  onClick={handleSignOut}
-                  className="bg-secondary hover:bg-sand text-accent font-bold py-2 px-4 rounded-lg transition duration-300"
-                >
-                  Sign Out
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-beige text-sm">{user.displayName || user.email}</span>
+                  <div className="flex gap-2">
+                    <Link
+                      href="/profile"
+                      className="bg-beige hover:bg-white text-primary font-bold py-2 px-4 rounded-lg transition duration-300"
+                    >
+                      Profile
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        href="/admin"
+                        className="bg-primary hover:bg-primary/90 text-beige font-bold py-2 px-4 rounded-lg transition duration-300"
+                      >
+                        Admin Dashboard
+                      </Link>
+                    )}
+                    <button
+                      onClick={handleSignOut}
+                      className="bg-secondary hover:bg-sand text-accent font-bold py-2 px-4 rounded-lg transition duration-300"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <Link
@@ -61,9 +72,9 @@ export default function Home() {
               <Link href="/submit" className="bg-secondary hover:bg-sand text-accent font-bold py-3 px-6 rounded-lg transition duration-300">
                 Submit Write up
               </Link>
-              <Link href="/profile" className="bg-beige hover:bg-white text-primary font-bold py-3 px-6 rounded-lg border-2 border-secondary transition duration-300">
+              {/* <Link href="/profile" className="bg-beige hover:bg-white text-primary font-bold py-3 px-6 rounded-lg border-2 border-secondary transition duration-300">
                 Your Profile
-              </Link>
+              </Link> */}
               <Link href="/books" className="bg-beige hover:bg-white text-primary font-bold py-3 px-6 rounded-lg border-2 border-secondary transition duration-300">
                 Reading Room
               </Link>

@@ -150,12 +150,12 @@ export default function BooksPage() {
                 <span className="text-lg font-bold text-primary">{book.price}</span>
                 <div className="flex gap-2">
                   <a
-                    href="https://docs.google.com/forms/d/e/1FAIpQLSdCw4cD8UXvs9UZsCTyKkmn2tPDh1gsakrgjmYX_hczy17QJw/viewform?usp=header" // Replace with your actual Google Form URL
+                    href="https://docs.google.com/forms/d/11LRxMFCKnNtTYZIxsKjahMV4p3A-eb-0ISMDXlpVz1o/edit" // Replace with your actual Google Form URL
                     target="_blank"
                     rel="noopener noreferrer"
                     className="bg-secondary text-accent px-4 py-2 rounded-lg hover:bg-sand transition duration-300"
                   >
-                    Order Now
+                    Buy Now
                   </a>
                   <a
                     href={book.fileUrl}

@@ -35,11 +35,10 @@ interface Book {
   views: number
 }
 
-function BooksList() {
+function BooksList({ selectedCategory }: { selectedCategory: string }) {
   const { user } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedCategory, setSelectedCategory] = useState('all')
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -220,11 +219,39 @@ function BooksList() {
 }
 
 export default function BooksPage() {
+  const [selectedCategory, setSelectedCategory] = useState('all')
+
   return (
     <div className="container mx-auto px-4 py-12">
       <h1 className="text-4xl font-playfair font-bold text-center mb-12 text-primary">Our Books</h1>
 
       {/* Categories */}
+      <div className="flex justify-center gap-4 mb-8">
+        <button 
+          onClick={() => setSelectedCategory('all')}
+          className={`px-4 py-2 rounded-lg transition duration-300 ${
+            selectedCategory === 'all' 
+              ? 'bg-secondary text-accent' 
+              : 'bg-beige text-primary hover:bg-sand hover:text-accent'
+          }`}
+        >
+          All Books
+        </button>
+        {BOOK_CATEGORIES.map(category => (
+          <button
+            key={category.id}
+            onClick={() => setSelectedCategory(category.id)}
+            className={`px-4 py-2 rounded-lg transition duration-300 ${
+              selectedCategory === category.id 
+                ? 'bg-secondary text-accent' 
+                : 'bg-beige text-primary hover:bg-sand hover:text-accent'
+            }`}
+          >
+            {category.label}
+          </button>
+        ))}
+      </div>
+
       <Suspense 
         fallback={
           <div className="min-h-screen flex items-center justify-center">
@@ -232,7 +259,7 @@ export default function BooksPage() {
           </div>
         }
       >
-        <BooksList />
+        <BooksList selectedCategory={selectedCategory} />
       </Suspense>
 
       {/* Featured Collections */}

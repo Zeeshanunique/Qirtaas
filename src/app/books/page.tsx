@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useEffect, useState, Suspense } from 'react'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import Image from 'next/image'
@@ -35,7 +35,7 @@ interface Book {
   views: number
 }
 
-export default function BooksPage() {
+function BooksList() {
   const { user } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
@@ -107,36 +107,7 @@ export default function BooksPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <h1 className="text-4xl font-playfair font-bold text-center mb-12 text-primary">Our Books</h1>
-
-      {/* Categories */}
-      <div className="flex justify-center gap-4 mb-8">
-        <button 
-          onClick={() => setSelectedCategory('all')}
-          className={`px-4 py-2 rounded-lg transition duration-300 ${
-            selectedCategory === 'all' 
-              ? 'bg-secondary text-accent' 
-              : 'bg-beige text-primary hover:bg-sand hover:text-accent'
-          }`}
-        >
-          All Books
-        </button>
-        {BOOK_CATEGORIES.map(category => (
-          <button
-            key={category.id}
-            onClick={() => setSelectedCategory(category.id)}
-            className={`px-4 py-2 rounded-lg transition duration-300 ${
-              selectedCategory === category.id 
-                ? 'bg-secondary text-accent' 
-                : 'bg-beige text-primary hover:bg-sand hover:text-accent'
-            }`}
-          >
-            {category.label}
-          </button>
-        ))}
-      </div>
-
+    <>
       {/* Books Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {filteredBooks.map((book) => (
@@ -244,6 +215,25 @@ export default function BooksPage() {
           onClose={handleClosePopup}
         />
       )}
+    </>
+  )
+}
+
+export default function BooksPage() {
+  return (
+    <div className="container mx-auto px-4 py-12">
+      <h1 className="text-4xl font-playfair font-bold text-center mb-12 text-primary">Our Books</h1>
+
+      {/* Categories */}
+      <Suspense 
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        }
+      >
+        <BooksList />
+      </Suspense>
 
       {/* Featured Collections */}
       <div className="mt-16">

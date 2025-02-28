@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ... existing rules ...
+    
+    match /bookViews/{viewId} {
+      allow read: if true;
+      allow write: if true; // Or implement more specific rules based on your needs
+    }
+  }
+}

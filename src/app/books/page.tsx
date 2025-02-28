@@ -6,6 +6,13 @@ import { db } from '@/lib/firebase'
 import Image from 'next/image'
 import { StaticImport } from 'next/dist/shared/lib/get-img-props'
 import { getGoogleDriveImageUrl } from '@/utils/imageUtils'
+import { BOOK_CATEGORIES } from '@/constants/categories'
+import BookSocial from '@/components/BookSocial'
+import { useAuth } from '@/contexts/AuthContext'
+import { incrementBookViews } from '@/utils/bookStats'
+import ShareButton from '@/components/ShareButton'
+import { useSearchParams, useRouter } from 'next/navigation'
+import BookPopup from '@/components/BookPopup'
 
 interface Book {
   price: ReactNode
@@ -17,13 +24,26 @@ interface Book {
   category: string
   fileUrl: string
   userEmail: string
+  likes: string[] // Array of user IDs who liked
+  comments: {
+    id: string
+    userId: string
+    userName: string
+    text: string
+    createdAt: string
+  }[]
+  views: number
 }
 
 export default function BooksPage() {
+  const { user } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
 
   useEffect(() => {
     const fetchBooks = async () => {
@@ -35,9 +55,17 @@ export default function BooksPage() {
         const querySnapshot = await getDocs(q)
         const booksData = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          likes: doc.data().likes || [],
+          comments: doc.data().comments || [],
+          views: doc.data().views || 0
         })) as Book[]
         setBooks(booksData)
+
+        // Track views only once when books are loaded
+        booksData.forEach(book => {
+          incrementBookViews(book.id, user?.uid)
+        })
       } catch (error) {
         console.error('Error fetching books:', error)
       } finally {
@@ -46,7 +74,25 @@ export default function BooksPage() {
     }
 
     fetchBooks()
-  }, [])
+  }, [user]) // Add user as dependency to re-run when auth state changes
+
+  useEffect(() => {
+    const bookId = searchParams.get('bookId')
+    if (bookId && books.length > 0) {
+      const book = books.find(b => b.id === bookId)
+      if (book) setSelectedBook(book)
+    }
+  }, [searchParams, books])
+
+  const handleBookClick = (book: Book) => {
+    setSelectedBook(book)
+    router.push(`/books?bookId=${book.id}`, { scroll: false })
+  }
+
+  const handleClosePopup = () => {
+    setSelectedBook(null)
+    router.push('/books', { scroll: false })
+  }
 
   const filteredBooks = selectedCategory === 'all' 
     ? books 
@@ -76,17 +122,17 @@ export default function BooksPage() {
         >
           All Books
         </button>
-        {['Fiction', 'Non-Fiction', 'Poetry'].map(category => (
+        {BOOK_CATEGORIES.map(category => (
           <button
-            key={category}
-            onClick={() => setSelectedCategory(category)}
+            key={category.id}
+            onClick={() => setSelectedCategory(category.id)}
             className={`px-4 py-2 rounded-lg transition duration-300 ${
-              selectedCategory === category 
+              selectedCategory === category.id 
                 ? 'bg-secondary text-accent' 
                 : 'bg-beige text-primary hover:bg-sand hover:text-accent'
             }`}
           >
-            {category}
+            {category.label}
           </button>
         ))}
       </div>
@@ -94,7 +140,11 @@ export default function BooksPage() {
       {/* Books Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {filteredBooks.map((book) => (
-          <div key={book.id} className="bg-beige rounded-lg shadow-lg overflow-hidden border border-secondary">
+          <div
+            key={book.id}
+            onClick={() => handleBookClick(book)}
+            className="bg-beige rounded-lg shadow-lg overflow-hidden border border-secondary cursor-pointer hover:shadow-xl transition-shadow duration-300"
+          >
             <div className="relative h-[400px]">
               {imageErrors[book.id] ? (
                 // Fallback placeholder with book title
@@ -137,7 +187,7 @@ export default function BooksPage() {
                   loading="lazy"
                   quality={75}
                   placeholder="blur"
-                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRseHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/2wBDAR4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRseHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/2wBDAR4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
                 />
               )}
             </div>
@@ -167,10 +217,33 @@ export default function BooksPage() {
                   </a>
                 </div>
               </div>
+              <BookSocial
+                bookId={book.id}
+                likes={book.likes || []}
+                comments={book.comments || []}
+                views={book.views || 0}
+              />
+              <div className="mt-4 border-t border-gray-200 pt-4">
+                <div className="flex justify-between items-center">
+                  <ShareButton
+                    title={book.title}
+                    description={`Check out "${book.title}" by ${book.author} on Qirtaas`}
+                    url={`${window.location.origin}/books?bookId=${book.id}`}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Add Popup */}
+      {selectedBook && (
+        <BookPopup
+          book={selectedBook}
+          onClose={handleClosePopup}
+        />
+      )}
 
       {/* Featured Collections */}
       <div className="mt-16">

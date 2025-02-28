@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase'
 import axios from 'axios'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import { BOOK_CATEGORIES } from '@/constants/categories'
 
 // Add this function before the component
 const uploadLargeFile = async (file: File, onProgress?: (progress: number) => void): Promise<string> => {
@@ -203,10 +204,11 @@ export default function SubmitPage() {
                 required
               >
                 <option value="">Select a category</option>
-                <option value="book">Book</option>
-                <option value="story">Short Story</option>
-                <option value="poetry">Poetry</option>
-                <option value="article">Article</option>
+                {BOOK_CATEGORIES.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.label}
+                  </option>
+                ))}
               </select>
             </div>
 

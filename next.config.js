@@ -34,9 +34,9 @@ const nextConfig = {
   },
   api: {
     bodyParser: {
-      sizeLimit: '20mb',
+      sizeLimit: '50mb',
     },
-    responseLimit: '20mb',
+    responseLimit: '50mb',
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

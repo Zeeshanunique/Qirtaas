@@ -83,9 +83,9 @@ export default function SubmitPage() {
         throw new Error('Please select a cover image')
       }
 
-      // Check manuscript file size (10MB limit)
-      if (manuscriptFile.size > 20 * 1024 * 1024) {
-        throw new Error('Manuscript file size exceeds 10MB limit')
+      // Check manuscript file size (50MB limit)
+      if (manuscriptFile.size > 50 * 1024 * 1024) {
+        throw new Error('Manuscript file size exceeds 50MB limit')
       }
 
       // Check cover file size (2MB limit)
@@ -256,7 +256,7 @@ export default function SubmitPage() {
                   hover:file:bg-gray-700"
                 required
               />
-              <p className="mt-1 text-sm text-gray-500">Accepted formats: PDF, DOC, DOCX Max size: 10MB</p>
+              <p className="mt-1 text-sm text-gray-500">Accepted formats: PDF, DOC, DOCX Max size: 50MB</p>
             </div>
 
             {(uploadProgress.manuscript > 0 || uploadProgress.cover > 0) && (
@@ -320,7 +320,7 @@ export default function SubmitPage() {
             <ul className="list-disc list-inside space-y-2 text-gray-700">
               <li>Ensure your manuscript is properly formatted and edited</li>
               <li>Include a detailed synopsis if submitting a book</li>
-              <li>Manuscript file size limit: 10MB</li>
+              <li>Manuscript file size limit: 50MB</li>
               <li>Cover image requirements:
                 <ul className="list-disc list-inside ml-4 mt-1">
                   <li>Format: JPG or PNG</li>

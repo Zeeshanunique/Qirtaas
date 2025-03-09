@@ -376,7 +376,7 @@ export default function AdminDashboard() {
                   {selectedSubmission.isPaid && (
                     <div>
                       <label className="block font-semibold text-gray-700 mb-2">
-                        Price (SAR)
+                        Price (INR)
                       </label>
                       <input
                         type="number"

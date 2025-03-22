@@ -33,6 +33,9 @@ interface Book {
     createdAt: string
   }[]
   views: number
+  name: string
+  isPaid: boolean
+  paymentStatus: 'pending' | 'verified' | 'none'
 }
 
 function BooksList({ selectedCategory }: { selectedCategory: string }) {
@@ -57,7 +60,9 @@ function BooksList({ selectedCategory }: { selectedCategory: string }) {
           ...doc.data(),
           likes: doc.data().likes || [],
           comments: doc.data().comments || [],
-          views: doc.data().views || 0
+          views: doc.data().views || 0,
+          isPaid: doc.data().isPaid || false,
+          paymentStatus: doc.data().paymentStatus || 'none'
         })) as Book[]
         setBooks(booksData)
 
@@ -157,34 +162,73 @@ function BooksList({ selectedCategory }: { selectedCategory: string }) {
                   loading="lazy"
                   quality={75}
                   placeholder="blur"
-                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDABQODxIPDRQSEBIXFRQdHx4eHRseHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/2wBDAR4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                  blurDataURL="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFDQJYu4jlUQAAAABJRU5ErkJggg=="
                 />
               )}
             </div>
             <div className="p-6">
               <div className="text-sm text-accent mb-2 font-arabic">{book.category}</div>
               <h3 className="text-xl font-playfair font-bold mb-2 text-primary">{book.title}</h3>
-              <p className="text-accent mb-2">by {book.author}</p>
+              <p className="text-accent mb-2">by {book.name}</p>
               <p className="text-accent mb-4">{book.description}</p>
               <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-primary">{book.price}</span>
+                <span className="text-lg font-bold text-primary">
+                  {book.isPaid ? (
+                    <span className="flex items-center">
+                      {typeof book.price === 'string' || typeof book.price === 'number' ? book.price : ''} INR
+                      <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
+                        book.paymentStatus === 'verified' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {book.paymentStatus === 'verified' ? 'Verified' : 'Payment Required'}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-green-600">Free</span>
+                  )}
+                </span>
                 <div className="flex gap-2">
-                  <a
-                    href="https://docs.google.com/forms/d/11LRxMFCKnNtTYZIxsKjahMV4p3A-eb-0ISMDXlpVz1o/edit" // Replace with your actual Google Form URL
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-secondary text-accent px-4 py-2 rounded-lg hover:bg-sand transition duration-300"
-                  >
-                    Buy Now
-                  </a>
-                  <a
-                    href={book.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-primary text-beige px-4 py-2 rounded-lg hover:bg-primary/90 transition duration-300"
-                  >
-                    Read Now
-                  </a>
+                  {book.isPaid ? (
+                    <>
+                      <a
+                        href="https://docs.google.com/forms/d/11LRxMFCKnNtTYZIxsKjahMV4p3A-eb-0ISMDXlpVz1o/edit"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-secondary text-accent px-4 py-2 rounded-lg hover:bg-sand transition duration-300"
+                      >
+                        Buy Now
+                      </a>
+                      {book.paymentStatus === 'verified' ? (
+                        <a
+                          href={book.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-primary text-beige px-4 py-2 rounded-lg hover:bg-primary/90 transition duration-300"
+                        >
+                          Read Now
+                        </a>
+                      ) : (
+                        <button
+                          disabled
+                          className="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
+                        >
+                          Payment Pending
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <a
+                        href={book.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-primary text-beige px-4 py-2 rounded-lg hover:bg-primary/90 transition duration-300"
+                      >
+                        Read Now
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
               <BookSocial
@@ -197,7 +241,7 @@ function BooksList({ selectedCategory }: { selectedCategory: string }) {
                 <div className="flex justify-between items-center">
                   <ShareButton
                     title={book.title}
-                    description={`Check out "${book.title}" by ${book.author} on Qirtaas`}
+                    description={`Check out "${book.title}" by ${book.name} on Qirtaas`}
                     url={`${window.location.origin}/books?bookId=${book.id}`}
                   />
                 </div>
@@ -222,87 +266,47 @@ export default function BooksPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <h1 className="text-4xl font-playfair font-bold text-center mb-12 text-primary">Our Books</h1>
-
-      {/* Categories */}
-      <div className="flex justify-center gap-4 mb-8">
-        <button 
-          onClick={() => setSelectedCategory('all')}
-          className={`px-4 py-2 rounded-lg transition duration-300 ${
-            selectedCategory === 'all' 
-              ? 'bg-secondary text-accent' 
-              : 'bg-beige text-primary hover:bg-sand hover:text-accent'
-          }`}
-        >
-          All Books
-        </button>
-        {BOOK_CATEGORIES.map(category => (
+    <div className="min-h-screen bg-beige">
+      <div className="container mx-auto px-4 py-12">
+        <h1 className="text-4xl font-playfair font-bold text-center mb-12 text-primary">
+          Explore Our Books
+        </h1>
+        
+        {/* Categories Filter */}
+        <div className="flex flex-wrap justify-center gap-3 mb-12">
           <button
-            key={category.id}
-            onClick={() => setSelectedCategory(category.id)}
-            className={`px-4 py-2 rounded-lg transition duration-300 ${
-              selectedCategory === category.id 
-                ? 'bg-secondary text-accent' 
-                : 'bg-beige text-primary hover:bg-sand hover:text-accent'
-            }`}
+            onClick={() => setSelectedCategory('all')}
+            className={`px-4 py-2 rounded-full ${
+              selectedCategory === 'all' 
+                ? 'bg-primary text-beige' 
+                : 'bg-secondary text-accent hover:bg-sand'
+            } transition-colors`}
           >
-            {category.label}
+            All
           </button>
-        ))}
-      </div>
-
-      <Suspense 
-        fallback={
+          
+          {BOOK_CATEGORIES.map(category => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={`px-4 py-2 rounded-full ${
+                selectedCategory === category.id 
+                  ? 'bg-primary text-beige' 
+                  : 'bg-secondary text-accent hover:bg-sand'
+              } transition-colors`}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+        
+        <Suspense fallback={
           <div className="min-h-screen flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
-        }
-      >
-        <BooksList selectedCategory={selectedCategory} />
-      </Suspense>
-
-      {/* Featured Collections */}
-      <div className="mt-16">
-        <h2 className="text-3xl font-playfair font-bold text-center mb-8 text-primary">Featured Collections</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-beige p-6 rounded-lg shadow-lg border border-secondary">
-            <h3 className="text-xl font-playfair font-bold mb-4 text-primary">New Releases</h3>
-            <p className="text-accent mb-4">
-              Discover our latest publications, featuring emerging voices and established authors.
-            </p>
-            <button className="text-primary hover:text-secondary transition duration-300">
-              Explore New Releases →
-            </button>
-          </div>
-          <div className="bg-beige p-6 rounded-lg shadow-lg border border-secondary">
-            <h3 className="text-xl font-playfair font-bold mb-4 text-primary">Award Winners</h3>
-            <p className="text-accent mb-4">
-              Browse through our collection of critically acclaimed and award-winning titles.
-            </p>
-            <button className="text-primary hover:text-secondary transition duration-300">
-              View Award Winners →
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Newsletter Signup */}
-      <div className="mt-16 bg-gradient-to-r from-primary to-accent rounded-lg p-8 text-center">
-        <h2 className="text-2xl font-playfair font-bold mb-4 text-beige">Stay Updated</h2>
-        <p className="text-beige mb-6">
-          Subscribe to our newsletter to receive updates about new releases and special offers.
-        </p>
-        <div className="max-w-md mx-auto flex gap-4">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            className="flex-1 px-4 py-2 rounded-lg border-secondary focus:border-secondary focus:ring-secondary bg-beige text-accent"
-          />
-          <button className="bg-secondary text-accent px-6 py-2 rounded-lg hover:bg-sand transition duration-300">
-            Subscribe
-          </button>
-        </div>
+        }>
+          <BooksList selectedCategory={selectedCategory} />
+        </Suspense>
       </div>
     </div>
   )

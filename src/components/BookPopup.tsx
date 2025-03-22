@@ -50,26 +50,69 @@ export default function BookPopup({ book, onClose }: BookPopupProps) {
             <div>
               <div className="text-sm text-accent mb-2 font-arabic">{book.category}</div>
               <h2 className="text-3xl font-playfair font-bold mb-4 text-primary">{book.title}</h2>
-              <p className="text-accent mb-4">by {book.author}</p>
+              <p className="text-accent mb-4">by {book.name}</p>
               <p className="text-accent mb-6">{book.description}</p>
               
+              <div className="flex items-center mb-4">
+                <span className="text-xl font-bold text-primary mr-3">
+                  {book.isPaid ? (
+                    <span className="flex items-center">
+                      {typeof book.price === 'string' || typeof book.price === 'number' ? book.price : ''} INR
+                      <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
+                        book.paymentStatus === 'verified' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {book.paymentStatus === 'verified' ? 'Verified' : 'Payment Required'}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-green-600">Free</span>
+                  )}
+                </span>
+              </div>
+              
               <div className="flex gap-4 mb-8">
-                <a
-                  href="https://docs.google.com/forms/d/11LRxMFCKnNtTYZIxsKjahMV4p3A-eb-0ISMDXlpVz1o/edit"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 bg-secondary text-accent px-6 py-3 rounded-lg hover:bg-sand transition duration-300 text-center"
-                >
-                  Buy Now
-                </a>
-                <a
-                  href={book.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 bg-primary text-beige px-6 py-3 rounded-lg hover:bg-primary/90 transition duration-300 text-center"
-                >
-                  Read Now
-                </a>
+                {book.isPaid ? (
+                  <>
+                    <a
+                      href="https://docs.google.com/forms/d/11LRxMFCKnNtTYZIxsKjahMV4p3A-eb-0ISMDXlpVz1o/edit"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-secondary text-accent px-6 py-3 rounded-lg hover:bg-sand transition duration-300 text-center"
+                    >
+                      Buy Now
+                    </a>
+                    {book.paymentStatus === 'verified' ? (
+                      <a
+                        href={book.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-primary text-beige px-6 py-3 rounded-lg hover:bg-primary/90 transition duration-300 text-center"
+                      >
+                        Read Now
+                      </a>
+                    ) : (
+                      <button
+                        disabled
+                        className="flex-1 bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed"
+                      >
+                        Payment Pending
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <a
+                      href={book.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-primary text-beige px-6 py-3 rounded-lg hover:bg-primary/90 transition duration-300 text-center"
+                    >
+                      Read Now
+                    </a>
+                  </>
+                )}
               </div>
 
               <BookSocial
@@ -82,7 +125,7 @@ export default function BookPopup({ book, onClose }: BookPopupProps) {
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <ShareButton
                   title={book.title}
-                  description={`Check out "${book.title}" by ${book.author} on Qirtaas`}
+                  description={`Check out "${book.title}" by ${book.name} on Qirtaas`}
                   url={`${typeof window !== 'undefined' ? window.location.origin : ''}/books?bookId=${book.id}`} // Updated URL format
                 />
               </div>

@@ -90,6 +90,10 @@ export default function AdminDashboard() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
 
+  // Variable declarations for fileUrl instead of directLink
+  let fileId = '';
+  let fileUrl = '';
+
   useEffect(() => {
     if (!loading && (!user || !isAdmin(user.email))) {
       router.push('/')
@@ -281,41 +285,35 @@ export default function AdminDashboard() {
   };
 
   // Handle event image upload
-  const uploadEventImage = async (file: File): Promise<string> => {
-    if (!file) return ''
-    
+  const uploadEventImage = async (file: File, trackProgress?: (progress: number) => void): Promise<string> => {
     try {
-      setIsUploading(true)
-      setUploadProgress(0)
+      setUploadProgress(0);
+      setIsUploading(true);
       
-      // Compress the image first
-      console.log("Compressing image, original size:", Math.round(file.size / 1024), "KB")
-      const compressedBlob = await compressImage(file)
-      console.log("Compressed size:", Math.round(compressedBlob.size / 1024), "KB")
+      // Compress the image before upload
+      const compressedFile = await compressImage(file);
+      console.log(`Original size: ${Math.round(file.size / 1024)} KB, Compressed: ${Math.round(compressedFile.size / 1024)} KB`);
       
-      // Create a new File object from the compressed blob
-      const compressedFile = new File([compressedBlob], file.name, { type: file.type })
-      
-      // Check if file is large (over 2MB) or we're in production (Vercel)
+      // Check if file is large (2MB+) or if in Vercel production environment
       const isLargeFile = compressedFile.size > 2 * 1024 * 1024;
-      const isProduction = window.location.hostname.includes('vercel.app');
+      const isVercel = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
       
-      let fileId, directLink;
-      
-      if (isLargeFile || isProduction) {
-        // Use chunked upload for large files or in production
-        console.log("Using chunked upload for large file or production environment");
+      if (isLargeFile || isVercel) {
+        console.log(`Using chunked upload for ${isLargeFile ? 'large file' : 'Vercel environment'}`);
         
-        // Import the chunked upload utility
+        // Dynamically import the chunked upload utility only when needed
         const { uploadFileInChunks } = await import('@/lib/chunkedUpload');
         
-        // Set up progress tracking
+        // Tracking progress function to update UI
         const trackProgress = (progress: number) => {
           setUploadProgress(progress);
         };
         
+        // Convert Blob to File before uploading
+        const fileForUpload = new File([compressedFile], file.name, { type: file.type });
+        
         // Use chunked upload approach
-        const result = await uploadFileInChunks(compressedFile, '/api/upload-drive-chunk', 2 * 1024 * 1024, trackProgress);
+        const result = await uploadFileInChunks(fileForUpload, '/api/upload-drive-chunk', 2 * 1024 * 1024, trackProgress);
         
         if (!result.success || !result.fileId) {
           console.error("Chunked upload failed:", result.error);
@@ -323,7 +321,7 @@ export default function AdminDashboard() {
         }
         
         fileId = result.fileId;
-        directLink = result.directLink;
+        fileUrl = result.fileUrl || '';
       } else {
         // Use regular upload for smaller files in development
         // Create FormData to send to the API
@@ -334,42 +332,33 @@ export default function AdminDashboard() {
         console.log("Attempting to upload to Google Drive via API route...")
         const response = await fetch('/api/upload-drive', {
           method: 'POST',
-          body: formData,
+          body: formData
         })
         
-        // Check for error response from the API
         if (!response.ok) {
-          let errorMessage = 'Upload failed'
-          try {
-            const errorData = await response.json()
-            errorMessage = errorData.error || errorMessage
-            console.error("API error response:", errorData)
-          } catch (parseError) {
-            console.error("Failed to parse error response:", parseError)
-          }
-          throw new Error(errorMessage)
+          const errorData = await response.json();
+          console.error('Upload failed:', errorData);
+          throw new Error(errorData.error || 'File upload failed');
         }
         
-        // Parse the successful response
-        const data = await response.json()
-        if (!data.success || !data.fileId) {
-          throw new Error('Upload failed: No file ID received')
-        }
+        const data = await response.json();
+        console.log('Upload successful:', data);
         
         fileId = data.fileId;
-        directLink = data.directLink;
+        fileUrl = data.fileUrl;
       }
       
-      setUploadProgress(100);
+      // Update form state
       setIsUploading(false);
+      setUploadProgress(100);
       
-      // Return the direct link that can be used to display the image
-      return directLink || `https://drive.google.com/uc?export=view&id=${fileId}`;
+      // Return the direct link to the uploaded image
+      return fileUrl || `https://drive.google.com/uc?export=view&id=${fileId}`;
     } catch (error: any) {
-      setIsUploading(false)
-      console.error("Upload error:", error)
-      setError(`Upload error: ${error.message || 'Unknown error'}`)
-      throw error
+      console.error('Error uploading image:', error);
+      setError(`Upload failed: ${error.message}`);
+      setIsUploading(false);
+      throw error;
     }
   };
   

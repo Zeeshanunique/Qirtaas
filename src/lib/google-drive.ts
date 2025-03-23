@@ -52,9 +52,9 @@ export async function uploadToDrive(file: File): Promise<string> {
 
     // Get direct link for image display
     const fileId = response.data.id
-    const directLink = `https://drive.google.com/uc?export=view&id=${fileId}`
+    const fileUrl = `https://drive.google.com/uc?export=view&id=${fileId}`
     
-    return directLink
+    return fileUrl
   } catch (error) {
     console.error('Error uploading to Google Drive:', error)
     throw new Error('Failed to upload to Google Drive. Check server logs for details.')

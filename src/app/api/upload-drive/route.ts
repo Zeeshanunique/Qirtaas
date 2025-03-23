@@ -7,14 +7,15 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const maxDuration = 60
+export const fetchCache = 'force-no-store'
 
-// Configure bodyParser
-export const config = {
-  api: {
-    bodyParser: false,
-    responseLimit: false,
-  },
-};
+// Remove deprecated config
+// export const config = {
+//   api: {
+//     bodyParser: false,
+//     responseLimit: false,
+//   },
+// };
 
 async function bufferToStream(buffer: Buffer) {
   const stream = new Readable()

@@ -11,6 +11,7 @@ export interface Book {
   category: string
   fileUrl: string
   userEmail: string
+  name: string
   likes: string[]
   comments: {
     id: string
@@ -20,4 +21,6 @@ export interface Book {
     createdAt: string
   }[]
   views: number
+  isPaid: boolean
+  paymentStatus: 'pending' | 'verified' | 'none'
 }

@@ -3,10 +3,8 @@ import axios from 'axios';
 export interface ChunkUploadResponse {
   success: boolean;
   fileId?: string;
-  name?: string;
-  webViewLink?: string;
-  webContentLink?: string;
-  directLink?: string;
+  fileUrl?: string;
+  message?: string;
   error?: string;
   details?: any;
 }
@@ -52,7 +50,7 @@ export async function uploadFileInChunks(
       formData.append('totalChunks', totalChunks.toString());
       formData.append('chunk', chunk);
       
-      await axios.post('/api/upload-drive-chunk', formData);
+      await axios.post(endpoint, formData);
       
       if (onProgress) {
         onProgress((chunkIndex + 1) / totalChunks * 100);
@@ -60,12 +58,10 @@ export async function uploadFileInChunks(
     }
     
     // Step 3: Complete upload
-    const completeResponse = await axios.post('/api/upload-drive-complete', {
-      sessionId,
-      fileName: file.name,
-      fileType: file.type,
-      totalChunks
-    });
+    const completeFormData = new FormData();
+    completeFormData.append('sessionId', sessionId);
+    
+    const completeResponse = await axios.post('/api/upload-drive-complete', completeFormData);
     
     return completeResponse.data;
   } catch (error: any) {

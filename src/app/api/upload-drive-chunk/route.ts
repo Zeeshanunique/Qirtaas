@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { uploadSessions } from '../upload-drive-init/route';
+import uploadSessions from '@/lib/uploadSessions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

@@ -1,14 +1,8 @@
 {
   "functions": {
-    "api/upload-drive": {
+    "src/app/api/upload-drive/route": {
       "maxDuration": 60,
       "memory": 1024
     }
-  },
-  "routes": [
-    {
-      "source": "/api/upload-drive",
-      "destination": "/api/upload-drive"
-    }
-  ]
+  }
 } 

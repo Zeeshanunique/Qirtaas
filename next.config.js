@@ -28,15 +28,25 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'drive.google.com',
         pathname: '/thumbnail/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        pathname: '/d/**',
       }
     ],
     minimumCacheTTL: 3600,
   },
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-    responseLimit: '50mb',
+  experimental: {
+    serverComponentsExternalPackages: ['sharp'],
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/upload-drive',
+        destination: '/api/upload-drive',
+      },
+    ];
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

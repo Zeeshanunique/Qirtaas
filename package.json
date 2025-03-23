@@ -11,6 +11,7 @@
   "dependencies": {
     "@google-cloud/storage": "^7.15.1",
     "@react-oauth/google": "^0.12.1",
+    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.17",
     "axios": "^1.7.9",
     "firebase": "^11.3.1",
@@ -25,7 +26,8 @@
     "react-icons": "^5.4.0",
     "stream": "^0.0.3",
     "swiper": "^11.0.6",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",

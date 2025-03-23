@@ -85,7 +85,7 @@ export default function AdminDashboard() {
     imageUrl: ''
   })
   const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [eventError, setEventError] = useState('')
+  const [error, setError] = useState('')
   const [eventSuccess, setEventSuccess] = useState('')
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
@@ -131,7 +131,7 @@ export default function AdminDashboard() {
       setEvents(eventsList);
     } catch (error) {
       console.error('Error fetching events:', error);
-      setEventError('Failed to load events');
+      setError('Failed to load events');
     }
   };
 
@@ -296,75 +296,82 @@ export default function AdminDashboard() {
       // Create a new File object from the compressed blob
       const compressedFile = new File([compressedBlob], file.name, { type: file.type })
       
-      // Create FormData to send to the API
-      const formData = new FormData()
-      formData.append('file', compressedFile)
+      // Check if file is large (over 2MB) or we're in production (Vercel)
+      const isLargeFile = compressedFile.size > 2 * 1024 * 1024;
+      const isProduction = window.location.hostname.includes('vercel.app');
       
-      // Upload to Google Drive through our API route
-      console.log("Attempting to upload to Google Drive via API route...")
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
+      let fileId, directLink;
       
-      // Check for error response from the API
-      if (!response.ok) {
-        let errorMessage = 'Upload failed'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData.error || errorMessage
-          console.error("API error response:", errorData)
-        } catch (parseError) {
-          console.error("Failed to parse error response:", parseError)
+      if (isLargeFile || isProduction) {
+        // Use chunked upload for large files or in production
+        console.log("Using chunked upload for large file or production environment");
+        
+        // Import the chunked upload utility
+        const { uploadFileInChunks } = await import('@/lib/chunkedUpload');
+        
+        // Set up progress tracking
+        const trackProgress = (progress: number) => {
+          setUploadProgress(progress);
+        };
+        
+        // Use chunked upload approach
+        const result = await uploadFileInChunks(compressedFile, '/api/upload-drive-chunk', 2 * 1024 * 1024, trackProgress);
+        
+        if (!result.success || !result.fileId) {
+          console.error("Chunked upload failed:", result.error);
+          throw new Error(result.error || 'File upload failed');
         }
-        throw new Error(errorMessage)
-      }
-      
-      // Track upload progress
-      let progress = 0
-      const interval = setInterval(() => {
-        progress += 10
-        if (progress >= 100) {
-          clearInterval(interval)
-          progress = 100
-        }
-        setUploadProgress(progress)
-      }, 300)
-      
-      // Get the response data
-      const data = await response.json()
-      
-      // Clear the progress interval
-      clearInterval(interval)
-      setUploadProgress(100)
-      setIsUploading(false)
-      
-      console.log("Upload successful, URL:", data.directLink)
-      
-      // Store both URL formats in case one works better than the other
-      if (data.fileId) {
-        // Also cache the alternate URL format as a fallback
-        const alternateUrl = `https://lh3.googleusercontent.com/d/${data.fileId}`;
-        console.log("Alternate URL format:", alternateUrl);
-      }
-      
-      return data.directLink
-    } catch (error: any) {
-      // Log the full error for debugging
-      setIsUploading(false)
-      setUploadProgress(0)
-      console.error("Error uploading image:", error)
-      
-      // Return a more specific error message
-      if (error.message && error.message.includes('credentials')) {
-        throw new Error('Server configuration error: Google Drive API credentials not properly set in .env.local file. Please contact the administrator.')
-      } else if (error.message && error.message.includes('Failed to fetch')) {
-        throw new Error('Network error: Could not connect to the upload API. Please check your internet connection and try again.')
+        
+        fileId = result.fileId;
+        directLink = result.directLink;
       } else {
-        throw new Error(`Failed to upload image: ${error.message || 'Unknown error'}`)
+        // Use regular upload for smaller files in development
+        // Create FormData to send to the API
+        const formData = new FormData()
+        formData.append('file', compressedFile)
+        
+        // Upload to Google Drive through our API route
+        console.log("Attempting to upload to Google Drive via API route...")
+        const response = await fetch('/api/upload-drive', {
+          method: 'POST',
+          body: formData,
+        })
+        
+        // Check for error response from the API
+        if (!response.ok) {
+          let errorMessage = 'Upload failed'
+          try {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorMessage
+            console.error("API error response:", errorData)
+          } catch (parseError) {
+            console.error("Failed to parse error response:", parseError)
+          }
+          throw new Error(errorMessage)
+        }
+        
+        // Parse the successful response
+        const data = await response.json()
+        if (!data.success || !data.fileId) {
+          throw new Error('Upload failed: No file ID received')
+        }
+        
+        fileId = data.fileId;
+        directLink = data.directLink;
       }
+      
+      setUploadProgress(100);
+      setIsUploading(false);
+      
+      // Return the direct link that can be used to display the image
+      return directLink || `https://drive.google.com/uc?export=view&id=${fileId}`;
+    } catch (error: any) {
+      setIsUploading(false)
+      console.error("Upload error:", error)
+      setError(`Upload error: ${error.message || 'Unknown error'}`)
+      throw error
     }
-  }
+  };
   
   // Helper function to convert file to base64
   const convertFileToBase64 = (file: File): Promise<string> => {
@@ -467,13 +474,13 @@ export default function AdminDashboard() {
     
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setEventError('Image is too large. Maximum size is 10MB.')
+      setError('Image is too large. Maximum size is 10MB.')
       return
     }
     
     // Check file type
     if (!file.type.startsWith('image/')) {
-      setEventError('Only image files are allowed.')
+      setError('Only image files are allowed.')
       return
     }
     
@@ -496,7 +503,7 @@ export default function AdminDashboard() {
   const handleAddEvent = async (e: React.FormEvent) => {
     e.preventDefault()
     setEventLoading(true)
-    setEventError('')
+    setError('')
     setEventSuccess('')
     
     try {
@@ -583,7 +590,7 @@ export default function AdminDashboard() {
       fetchEvents()
     } catch (err: any) {
       console.error('Error adding/updating event:', err)
-      setEventError(err.message || 'Failed to add/update event')
+      setError(err.message || 'Failed to add/update event')
     } finally {
       setEventLoading(false)
     }
@@ -645,7 +652,7 @@ export default function AdminDashboard() {
 
     try {
       setEventLoading(true)
-      setEventError('')
+      setError('')
       setEventSuccess('')
       
       // Get the event details for the success message
@@ -665,7 +672,7 @@ export default function AdminDashboard() {
       }, 5000)
     } catch (error: any) {
       console.error('Error deleting event:', error)
-      setEventError(`Failed to delete event: ${error.message || 'Unknown error'}`)
+      setError(`Failed to delete event: ${error.message || 'Unknown error'}`)
     } finally {
       setEventLoading(false)
     }
@@ -690,7 +697,7 @@ export default function AdminDashboard() {
       imageUrl: ''
     })
     setImagePreview(null)
-    setEventError('')
+    setError('')
   }
 
   const filteredSubmissions = submissions.filter(sub => 
@@ -924,9 +931,9 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {eventError && (
+            {error && (
               <div className="mb-4 bg-red-100 text-red-700 p-3 rounded-lg">
-                {eventError}
+                {error}
               </div>
             )}
             

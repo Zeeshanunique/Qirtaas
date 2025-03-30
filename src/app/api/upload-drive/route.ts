@@ -7,14 +7,15 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const maxDuration = 60
+export const fetchCache = 'force-no-store'
 
-// Configure bodyParser
-export const config = {
-  api: {
-    bodyParser: false,
-    responseLimit: false,
-  },
-};
+// Remove deprecated config
+// export const config = {
+//   api: {
+//     bodyParser: false,
+//     responseLimit: false,
+//   },
+// };
 
 async function bufferToStream(buffer: Buffer) {
   const stream = new Readable()
@@ -134,8 +135,8 @@ export async function POST(req: Request) {
 
     // Get direct link to the file
     const fileId = response.data.id
-    const directLink = `https://drive.google.com/uc?export=view&id=${fileId}`
-    console.log(`File uploaded successfully. Direct link: ${directLink}`)
+    const fileUrl = `https://drive.google.com/uc?export=view&id=${fileId}`
+    console.log(`File uploaded successfully. Direct link: ${fileUrl}`)
 
     return NextResponse.json({ 
       success: true, 
@@ -143,7 +144,7 @@ export async function POST(req: Request) {
       name: response.data.name,
       webViewLink: response.data.webViewLink,
       webContentLink: response.data.webContentLink,
-      directLink
+      fileUrl
     })
   } catch (error: any) {
     console.error('Upload error:', error)

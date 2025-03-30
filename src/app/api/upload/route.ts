@@ -3,7 +3,7 @@ import { google } from 'googleapis'
 import { Readable } from 'stream'
 
 // Helper function to get direct image URL from Google Drive
-function getDirectLink(fileId: string): string {
+function getFileUrl(fileId: string): string {
   // This format works better with most browsers and avoids CORS issues
   return `https://drive.google.com/uc?export=view&id=${fileId}`
 }
@@ -131,8 +131,8 @@ export async function POST(request: NextRequest) {
       // Continue anyway, as the file is uploaded
     }
 
-    const directLink = getDirectLink(response.data.id as string)
-    console.log("Direct link generated:", directLink)
+    const fileUrl = getFileUrl(response.data.id as string)
+    console.log("Direct link generated:", fileUrl)
 
     // Return the file information
     return NextResponse.json({
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       fileId: response.data.id,
       fileName: response.data.name,
       webViewLink: response.data.webViewLink,
-      directLink: directLink,
+      fileUrl: fileUrl,
     })
   } catch (error: any) {
     console.error('Error uploading file to Google Drive:', error)

@@ -38,7 +38,8 @@ interface Book {
   paymentStatus: 'pending' | 'verified' | 'none'
 }
 
-function BooksList({ selectedCategory }: { selectedCategory: string }) {
+// Add searchQuery as a prop to BooksList
+function BooksList({ selectedCategory, searchQuery }: { selectedCategory: string, searchQuery: string }) {
   const { user } = useAuth()
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,9 +99,19 @@ function BooksList({ selectedCategory }: { selectedCategory: string }) {
     router.push('/books', { scroll: false })
   }
 
-  const filteredBooks = selectedCategory === 'all' 
-    ? books 
-    : books.filter(book => book.category.toLowerCase() === selectedCategory.toLowerCase())
+  // Update the filtering logic to include search
+  const filteredBooks = books
+    .filter(book => 
+      // Category filter
+      (selectedCategory === 'all' || book.category.toLowerCase() === selectedCategory.toLowerCase())
+      &&
+      // Search filter
+      (searchQuery === '' || 
+        book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (typeof book.author === 'string' && book.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (typeof book.name === 'string' && book.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    )
 
   if (loading) {
     return (
@@ -264,6 +275,7 @@ function BooksList({ selectedCategory }: { selectedCategory: string }) {
 
 export default function BooksPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
   return (
     <div className="min-h-screen bg-beige">
@@ -272,32 +284,37 @@ export default function BooksPage() {
           Explore Our Books
         </h1>
         
+        {/* Search Box */}
+        <div className="max-w-md mx-auto mb-8">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search books by title or author..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 pl-12 rounded-full border-gray-300 focus:ring-primary focus:border-primary bg-white"
+            />
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
+              <svg 
+                className="w-5 h-5" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth={2} 
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" 
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+        
         {/* Categories Filter */}
         <div className="flex flex-wrap justify-center gap-3 mb-12">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-4 py-2 rounded-full ${
-              selectedCategory === 'all' 
-                ? 'bg-primary text-beige' 
-                : 'bg-secondary text-accent hover:bg-sand'
-            } transition-colors`}
-          >
-            All
-          </button>
-          
-          {BOOK_CATEGORIES.map(category => (
-            <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`px-4 py-2 rounded-full ${
-                selectedCategory === category.id 
-                  ? 'bg-primary text-beige' 
-                  : 'bg-secondary text-accent hover:bg-sand'
-              } transition-colors`}
-            >
-              {category.label}
-            </button>
-          ))}
+          {/* ... existing category buttons ... */}
         </div>
         
         <Suspense fallback={
@@ -305,7 +322,10 @@ export default function BooksPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
         }>
-          <BooksList selectedCategory={selectedCategory} />
+          <BooksList 
+            selectedCategory={selectedCategory} 
+            searchQuery={searchQuery} 
+          />
         </Suspense>
       </div>
     </div>

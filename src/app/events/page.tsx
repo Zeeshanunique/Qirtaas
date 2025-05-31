@@ -17,6 +17,7 @@ interface Event {
   category: string
   image?: string
   imageUrl: string
+  registrationFormUrl?: string
   createdAt: string
   updatedAt?: string
 }
@@ -54,6 +55,46 @@ const extractGoogleDriveFileId = (url: string): string | null => {
     console.error('Error extracting Google Drive file ID:', error)
     return null
   }
+}
+
+// Convert Google Drive share link to direct image URL
+const getGoogleDriveDirectLink = (url: string): string => {
+  const fileId = extractGoogleDriveFileId(url)
+  if (fileId) {
+    return `https://drive.google.com/uc?export=view&id=${fileId}`
+  }
+  // If not a Google Drive URL, return the URL unchanged
+  return url
+}
+
+// Format time for display in 12-hour format
+const formatTimeForDisplay = (timeString: string): string => {
+  if (!timeString) return ''
+  
+  // If it already contains AM/PM, assume it's already formatted
+  if (timeString.includes('AM') || timeString.includes('PM')) {
+    return timeString
+  }
+  
+  // Format each time
+  const formatSingleTime = (time: string): string => {
+    try {
+      const [hours, minutes] = time.split(':').map(Number)
+      const period = hours >= 12 ? 'PM' : 'AM'
+      const formattedHours = hours % 12 || 12 // Convert 0 to 12
+      return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`
+    } catch (error) {
+      return time // Return original if parsing fails
+    }
+  }
+  
+  // Handle case where timeString contains a time range
+  if (timeString.includes('-')) {
+    const [startTime, endTime] = timeString.split('-').map(t => t.trim())
+    return `${formatSingleTime(startTime)} - ${formatSingleTime(endTime)}`
+  }
+  
+  return formatSingleTime(timeString)
 }
 
 export default function Events() {
@@ -165,24 +206,34 @@ export default function Events() {
                       <div className="flex items-center text-accent">
                         <FaCalendar className="w-4 h-4 mr-2" />
                         <span>{event.date}</span>
-                      </div>
-                      <div className="flex items-center text-accent">
+                      </div>                      <div className="flex items-center text-accent">
                         <FaClock className="w-4 h-4 mr-2" />
-                        <span>{event.time}</span>
+                        <span>{formatTimeForDisplay(event.time)}</span>
                       </div>
                       <div className="flex items-center text-accent">
                         <FaMapMarkerAlt className="w-4 h-4 mr-2" />
                         <span>{event.location}</span>
                       </div>
-                    </div>
-                    <p className="text-accent mb-6">
+                    </div>                    <p className="text-accent mb-6">
                       {event.description.length > 150 
                         ? `${event.description.substring(0, 150)}...` 
                         : event.description}
                     </p>
-                    <Link href={`/events/${event.id}`} className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition duration-300">
-                      Learn More
-                    </Link>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Link href={`/events/${event.id}`} className="inline-block px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition duration-300 text-center">
+                        Learn More
+                      </Link>
+                      {event.registrationFormUrl && (
+                        <a 
+                          href={event.registrationFormUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block px-6 py-2 bg-secondary text-primary border border-primary rounded-lg hover:bg-primary hover:text-white transition duration-300 text-center"
+                        >
+                          Register Now
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

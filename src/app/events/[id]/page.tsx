@@ -17,6 +17,7 @@ interface Event {
   category: string
   image?: string
   imageUrl: string
+  registrationFormUrl?: string
   createdAt: string
   updatedAt?: string
 }
@@ -54,6 +55,46 @@ const extractGoogleDriveFileId = (url: string): string | null => {
     console.error('Error extracting Google Drive file ID:', error)
     return null
   }
+}
+
+// Convert Google Drive share link to direct image URL
+const getGoogleDriveDirectLink = (url: string): string => {
+  const fileId = extractGoogleDriveFileId(url)
+  if (fileId) {
+    return `https://drive.google.com/uc?export=view&id=${fileId}`
+  }
+  // If not a Google Drive URL, return the URL unchanged
+  return url
+}
+
+// Format time for display in 12-hour format
+const formatTimeForDisplay = (timeString: string): string => {
+  if (!timeString) return ''
+  
+  // If it already contains AM/PM, assume it's already formatted
+  if (timeString.includes('AM') || timeString.includes('PM')) {
+    return timeString
+  }
+  
+  // Format each time
+  const formatSingleTime = (time: string): string => {
+    try {
+      const [hours, minutes] = time.split(':').map(Number)
+      const period = hours >= 12 ? 'PM' : 'AM'
+      const formattedHours = hours % 12 || 12 // Convert 0 to 12
+      return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`
+    } catch (error) {
+      return time // Return original if parsing fails
+    }
+  }
+  
+  // Handle case where timeString contains a time range
+  if (timeString.includes('-')) {
+    const [startTime, endTime] = timeString.split('-').map(t => t.trim())
+    return `${formatSingleTime(startTime)} - ${formatSingleTime(endTime)}`
+  }
+  
+  return formatSingleTime(timeString)
 }
 
 export default function EventDetail({ params }: { params: { id: string } }) {
@@ -169,14 +210,13 @@ export default function EventDetail({ params }: { params: { id: string } }) {
                   <p className="text-lg text-primary">{event.date}</p>
                 </div>
               </div>
-              
-              <div className="flex items-start">
+                <div className="flex items-start">
                 <div className="bg-secondary/20 p-3 rounded-full mr-4">
                   <FaClock className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-medium text-accent mb-1">Time</h3>
-                  <p className="text-lg text-primary">{event.time}</p>
+                  <p className="text-lg text-primary">{formatTimeForDisplay(event.time)}</p>
                 </div>
               </div>
               
@@ -197,11 +237,22 @@ export default function EventDetail({ params }: { params: { id: string } }) {
                 <p className="whitespace-pre-line">{event.description}</p>
               </div>
             </div>
-            
-            <div className="flex justify-center">
-              <button className="px-8 py-3 bg-primary text-white text-lg font-medium rounded-lg hover:bg-primary/90 transition duration-300">
-                Register for this Event
-              </button>
+              <div className="flex justify-center">
+              {event.registrationFormUrl ? (
+                <a 
+                  href={event.registrationFormUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-8 py-3 bg-primary text-white text-lg font-medium rounded-lg hover:bg-primary/90 transition duration-300"
+                >
+                  Register for this Event
+                </a>
+              ) : (
+                <div className="text-center">
+                  <p className="text-accent mb-2">Registration information will be available soon.</p>
+                  <p className="text-sm text-gray-500">Please check back later for registration details.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

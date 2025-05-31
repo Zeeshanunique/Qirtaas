@@ -35,6 +35,7 @@ interface Event {
   category?: string
   image?: string
   imageUrl: string
+  registrationFormUrl?: string
   createdAt: string
   updatedAt?: string
 }
@@ -51,6 +52,7 @@ interface EventFormData {
   category: string;
   image: File | null;
   imageUrl: string;
+  registrationFormUrl: string;
 }
 
 export default function AdminDashboard() {
@@ -64,8 +66,7 @@ export default function AdminDashboard() {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null)
   const [reviewNotes, setReviewNotes] = useState('')
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
-  
-  // Events state
+    // Events state
   const [events, setEvents] = useState<Event[]>([])
   const [isAddingEvent, setIsAddingEvent] = useState(false)
   const [isEditingEvent, setIsEditingEvent] = useState(false)
@@ -82,7 +83,8 @@ export default function AdminDashboard() {
     description: '',
     category: 'Book Launch',
     image: null,
-    imageUrl: ''
+    imageUrl: '',
+    registrationFormUrl: ''
   })
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -530,8 +532,7 @@ export default function AdminDashboard() {
           throw new Error(`Image upload failed: ${uploadError.message}`)
         }
       }
-      
-      // Create new event data object
+        // Create new event data object
       const eventData = {
         title: eventFormData.title,
         date: eventFormData.date,
@@ -540,6 +541,7 @@ export default function AdminDashboard() {
         description: eventFormData.description,
         category: eventFormData.category,
         imageUrl: imageUrl,
+        registrationFormUrl: eventFormData.registrationFormUrl || null,
         createdAt: new Date().toISOString()
       }
 
@@ -555,8 +557,7 @@ export default function AdminDashboard() {
         await addDoc(collection(db, 'events'), eventData)
         setEventSuccess('Event added successfully!')
       }
-      
-      // Reset form
+        // Reset form
       setEventFormData({
         id: '',
         title: '',
@@ -568,7 +569,8 @@ export default function AdminDashboard() {
         description: '',
         category: 'Book Launch',
         image: null,
-        imageUrl: ''
+        imageUrl: '',
+        registrationFormUrl: ''
       })
       setImagePreview(null)
       setIsAddingEvent(false)
@@ -612,8 +614,7 @@ export default function AdminDashboard() {
     
     // Use imageUrl property if it exists, otherwise fall back to image
     const imageSource = event.imageUrl || event.image || '';
-    
-    setEventFormData({
+      setEventFormData({
       id: event.id,
       title: event.title,
       date: event.date,
@@ -624,7 +625,8 @@ export default function AdminDashboard() {
       description: event.description,
       category: event.category || 'Book Launch',
       image: null,
-      imageUrl: imageSource
+      imageUrl: imageSource,
+      registrationFormUrl: event.registrationFormUrl || ''
     })
     
     // Set image preview from existing image URL
@@ -666,7 +668,6 @@ export default function AdminDashboard() {
       setEventLoading(false)
     }
   }
-
   // Cancel event form
   const handleCancelEventForm = () => {
     setIsAddingEvent(false)
@@ -683,7 +684,8 @@ export default function AdminDashboard() {
       description: '',
       category: 'Book Launch',
       image: null,
-      imageUrl: ''
+      imageUrl: '',
+      registrationFormUrl: ''
     })
     setImagePreview(null)
     setError('')
@@ -1058,6 +1060,22 @@ export default function AdminDashboard() {
                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
                         required
                       />
+                    </div>                    <div>
+                      <label htmlFor="registrationFormUrl" className="block text-sm font-medium text-gray-700">
+                        Registration Form URL (Optional)
+                      </label>
+                      <input
+                        type="url"
+                        id="registrationFormUrl"
+                        name="registrationFormUrl"
+                        value={eventFormData.registrationFormUrl}
+                        onChange={handleEventFormChange}
+                        placeholder="https://forms.google.com/..."
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Provide a Google Form or other registration URL for attendees to register for this event
+                      </p>
                     </div>
                     <div>
                       <label htmlFor="image" className="block text-sm font-medium text-gray-700">
@@ -1213,10 +1231,9 @@ export default function AdminDashboard() {
                             <div className="flex items-center text-accent">
                               <FaCalendar className="w-4 h-4 mr-2" />
                               <span>{event.date}</span>
-                            </div>
-                            <div className="flex items-center text-accent">
+                            </div>                            <div className="flex items-center text-accent">
                               <FaClock className="w-4 h-4 mr-2" />
-                              <span>{event.time}</span>
+                              <span>{formatTimeForDisplay(event.time)}</span>
                             </div>
                             <div className="flex items-center text-accent">
                               <FaMapMarkerAlt className="w-4 h-4 mr-2" />

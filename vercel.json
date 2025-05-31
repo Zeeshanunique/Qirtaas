@@ -20,5 +20,9 @@
       "maxDuration": 60,
       "memory": 1024
     }
-  }
+  },
+  "buildCommand": "next build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "regions": ["iad1"]
 }

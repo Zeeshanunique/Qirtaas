@@ -1,8 +1,24 @@
 {
   "functions": {
-    "src/app/api/upload-drive/route": {
+    "src/app/api/upload-drive/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/upload-drive-simple/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/upload-drive-init/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/upload-drive-chunk/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    },
+    "src/app/api/upload-drive-complete/route.ts": {
       "maxDuration": 60,
       "memory": 1024
     }
   }
-} 
+}

@@ -299,31 +299,60 @@ export default function AdminDashboard() {
       // Check if file is large (2MB+) or if in Vercel production environment
       const isLargeFile = compressedFile.size > 2 * 1024 * 1024;
       const isVercel = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
-      
-      if (isLargeFile || isVercel) {
+        if (isLargeFile || isVercel) {
         console.log(`Using chunked upload for ${isLargeFile ? 'large file' : 'Vercel environment'}`);
         
-        // Dynamically import the chunked upload utility only when needed
-        const { uploadFileInChunks } = await import('@/lib/chunkedUpload');
-        
-        // Tracking progress function to update UI
-        const trackProgress = (progress: number) => {
-          setUploadProgress(progress);
-        };
-        
-        // Convert Blob to File before uploading
-        const fileForUpload = new File([compressedFile], file.name, { type: file.type });
-        
-        // Use chunked upload approach
-        const result = await uploadFileInChunks(fileForUpload, '/api/upload-drive-chunk', 2 * 1024 * 1024, trackProgress);
-        
-        if (!result.success || !result.fileId) {
-          console.error("Chunked upload failed:", result.error);
-          throw new Error(result.error || 'File upload failed');
+        try {
+          // Dynamically import the chunked upload utility only when needed
+          const { uploadFileInChunks } = await import('@/lib/chunkedUpload');
+          
+          // Tracking progress function to update UI
+          const trackProgress = (progress: number) => {
+            setUploadProgress(progress);
+          };
+          
+          // Convert Blob to File before uploading
+          const fileForUpload = new File([compressedFile], file.name, { type: file.type });
+          
+          // Use chunked upload approach
+          const result = await uploadFileInChunks(fileForUpload, '/api/upload-drive-chunk', 2 * 1024 * 1024, trackProgress);
+          
+          if (!result.success || !result.fileId) {
+            console.error("Chunked upload failed:", result.error);
+            throw new Error(result.error || 'Chunked upload failed');
+          }
+          
+          fileId = result.fileId;
+          fileUrl = result.fileUrl || '';
+        } catch (chunkError: any) {
+          console.warn('Chunked upload failed, falling back to simple upload:', chunkError.message);
+          
+          // Fallback to simple upload if file is under 10MB
+          if (compressedFile.size <= 10 * 1024 * 1024) {
+            const formData = new FormData();
+            formData.append('file', compressedFile);
+            
+            console.log("Attempting fallback to simple upload...");
+            const response = await fetch('/api/upload-drive-simple', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error('Simple upload fallback failed:', errorData);
+              throw new Error(errorData.error || 'Both chunked and simple upload failed');
+            }
+            
+            const data = await response.json();
+            console.log('Simple upload fallback successful:', data);
+            
+            fileId = data.fileId;
+            fileUrl = data.fileUrl;
+          } else {
+            throw new Error('File too large for simple upload fallback');
+          }
         }
-        
-        fileId = result.fileId;
-        fileUrl = result.fileUrl || '';
       } else {
         // Use regular upload for smaller files in development
         // Create FormData to send to the API

@@ -133,10 +133,9 @@ export default function Events() {
     : events.filter(event => event.category === filter)
 
   return (
-    <div className="min-h-screen bg-beige">
-      {/* Hero Section */}
+    <div className="min-h-screen bg-beige">      {/* Hero Section */}
       <section className="relative h-[40vh] flex items-center justify-center bg-gradient-to-r from-primary/90 to-primary">
-        <div className="absolute inset-0 bg-[url('/images/banner-bg.jpg')] bg-cover bg-center mix-blend-overlay"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-primary/20"></div>
         <div className="text-center text-white z-10 px-4">
           <h1 className="text-4xl md:text-5xl font-playfair font-bold mb-4">Events & Gatherings</h1>
           <p className="text-xl max-w-2xl mx-auto">

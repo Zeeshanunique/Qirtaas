@@ -298,186 +298,52 @@ export default function AdminDashboard() {
 
   // Handle delete submission
   const handleDeleteSubmission = async (submissionId: string) => {
-    if (!window.confirm('Are you sure you want to delete this submission? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to delete this submission?')) {
       return
     }
-
+    
     try {
-      setUpdateLoading(true)
-      const submissionRef = doc(db, 'submissions', submissionId)
-      await deleteDoc(submissionRef)
-      
+      await deleteDoc(doc(db, 'submissions', submissionId))
       setSubmissions(prev => prev.filter(sub => sub.id !== submissionId))
     } catch (error) {
       console.error('Error deleting submission:', error)
-    } finally {
-      setUpdateLoading(false)
     }
   }
 
-  // Image compression function
-  const compressImage = async (file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d')!;
-          
-          // Target width and height (max dimensions while preserving aspect ratio)
-          const MAX_WIDTH = 1200;
-          const MAX_HEIGHT = 1200;
-          
-          let width = img.width;
-          let height = img.height;
-          
-          // Calculate new dimensions
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height = Math.round(height * (MAX_WIDTH / width));
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width = Math.round(width * (MAX_HEIGHT / height));
-              height = MAX_HEIGHT;
-            }
-          }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          // Draw image on canvas with new dimensions
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          // Get reduced file as blob
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                resolve(blob);
-              } else {
-                reject(new Error('Canvas to Blob conversion failed'));
-              }
-            },
-            file.type,
-            0.8 // Quality parameter for JPEG (0.8 = 80% quality)
-          );
-        };
-        
-        img.onerror = () => {
-          reject(new Error('Failed to load image'));
-        };
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-    });
-  };
-
-  // Handle event image upload
+  // Handle event image upload using the new direct upload system
   const uploadEventImage = async (file: File, trackProgress?: (progress: number) => void): Promise<string> => {
     try {
       setUploadProgress(0);
       setIsUploading(true);
       
-      // Compress the image before upload
-      const compressedFile = await compressImage(file);
-      console.log(`Original size: ${Math.round(file.size / 1024)} KB, Compressed: ${Math.round(compressedFile.size / 1024)} KB`);
+      // Use the new direct upload utility
+      const { uploadFile } = await import('@/lib/directUpload');
       
-      // Check if file is large (2MB+) or if in Vercel production environment
-      const isLargeFile = compressedFile.size > 2 * 1024 * 1024;
-      const isVercel = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
-        if (isLargeFile || isVercel) {
-        console.log(`Using chunked upload for ${isLargeFile ? 'large file' : 'Vercel environment'}`);
-        
-        try {
-          // Dynamically import the chunked upload utility only when needed
-          const { uploadFileInChunks } = await import('@/lib/chunkedUpload');
-          
-          // Tracking progress function to update UI
-          const trackProgress = (progress: number) => {
+      return new Promise((resolve, reject) => {
+        uploadFile({
+          file,
+          onProgress: (progress) => {
             setUploadProgress(progress);
-          };
-          
-          // Convert Blob to File before uploading
-          const fileForUpload = new File([compressedFile], file.name, { type: file.type });
-          
-          // Use chunked upload approach
-          const result = await uploadFileInChunks(fileForUpload, '/api/upload-drive-chunk', 2 * 1024 * 1024, trackProgress);
-          
-          if (!result.success || !result.fileId) {
-            console.error("Chunked upload failed:", result.error);
-            throw new Error(result.error || 'Chunked upload failed');
-          }
-          
-          fileId = result.fileId;
-          fileUrl = result.fileUrl || '';
-        } catch (chunkError: any) {
-          console.warn('Chunked upload failed, falling back to simple upload:', chunkError.message);
-          
-          // Fallback to simple upload if file is under 10MB
-          if (compressedFile.size <= 10 * 1024 * 1024) {
-            const formData = new FormData();
-            formData.append('file', compressedFile);
-            
-            console.log("Attempting fallback to simple upload...");
-            const response = await fetch('/api/upload-drive-simple', {
-              method: 'POST',
-              body: formData
-            });
-            
-            if (!response.ok) {
-              const errorData = await response.json();
-              console.error('Simple upload fallback failed:', errorData);
-              throw new Error(errorData.error || 'Both chunked and simple upload failed');
+            if (trackProgress) {
+              trackProgress(progress);
             }
+          },
+          onComplete: (result) => {
+            setIsUploading(false);
+            setUploadProgress(100);
             
-            const data = await response.json();
-            console.log('Simple upload fallback successful:', data);
-            
-            fileId = data.fileId;
-            fileUrl = data.fileUrl;
-          } else {
-            throw new Error('File too large for simple upload fallback');
+            if (result.success && result.fileUrl) {
+              resolve(result.fileUrl);
+            } else {
+              reject(new Error(result.error || 'Upload failed'));
+            }
+          },
+          onError: (error) => {
+            setIsUploading(false);
+            reject(error);
           }
-        }
-      } else {
-        // Use regular upload for smaller files in development
-        // Create FormData to send to the API
-        const formData = new FormData()
-        formData.append('file', compressedFile)
-        
-        // Upload to Google Drive through our API route
-        console.log("Attempting to upload to Google Drive via API route...")
-        const response = await fetch('/api/upload-drive', {
-          method: 'POST',
-          body: formData
-        })
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Upload failed:', errorData);
-          throw new Error(errorData.error || 'File upload failed');
-        }
-        
-        const data = await response.json();
-        console.log('Upload successful:', data);
-        
-        fileId = data.fileId;
-        fileUrl = data.fileUrl;
-      }
-      
-      // Update form state
-      setIsUploading(false);
-      setUploadProgress(100);
-      
-      // Return the direct link to the uploaded image
-      return fileUrl || `https://drive.google.com/uc?export=view&id=${fileId}`;
+        });
+      });
     } catch (error: any) {
       console.error('Error uploading image:', error);
       setError(`Upload failed: ${error.message}`);
@@ -585,9 +451,9 @@ export default function AdminDashboard() {
     // Reset the file input value to allow selecting the same file again
     e.target.value = ''
     
-    // Check file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('Image is too large. Maximum size is 10MB.')
+    // Check file size (max 50MB for direct upload)
+    if (file.size > 50 * 1024 * 1024) {
+      setError('Image is too large. Maximum size is 50MB.')
       return
     }
     
@@ -1373,7 +1239,7 @@ export default function AdminDashboard() {
                       <div className="mt-1 mb-2 p-3 bg-blue-50 rounded text-sm">
                         <p className="mb-2"><strong>Image Upload:</strong></p>
                         <p>Select an image from your device to upload directly to our cloud storage.</p>
-                        <p className="text-xs text-gray-500 mt-1">Supported formats: JPG, PNG, GIF. Max size: 10MB</p>
+                        <p className="text-xs text-gray-500 mt-1">Supported formats: JPG, PNG, GIF. Max size: 50MB</p>
                       </div>
                       <input
                         type="file"

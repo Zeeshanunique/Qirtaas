@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FaUsers, FaBook, FaPen, FaChevronDown } from 'react-icons/fa'
+import { FaUsers, FaBook, FaChevronDown } from 'react-icons/fa'
 import { COMMUNITY_LINKS } from '@/constants/communityLinks'
 
 interface JoinUsButtonProps {
@@ -82,18 +82,6 @@ export default function JoinUsButton({
                 <div>
                   <div className="font-medium">{COMMUNITY_LINKS.bookClubEnglish.label}</div>
                   <div className="text-sm text-gray-500">{COMMUNITY_LINKS.bookClubEnglish.description}</div>
-                </div>
-              </a>
-              
-              <a
-                href={COMMUNITY_LINKS.writersCommunity.url}
-                className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-primary transition-colors"
-                onClick={() => setIsOpen(false)}
-              >
-                <FaPen className="mr-3 text-accent" />
-                <div>
-                  <div className="font-medium">{COMMUNITY_LINKS.writersCommunity.label}</div>
-                  <div className="text-sm text-gray-500">{COMMUNITY_LINKS.writersCommunity.description}</div>
                 </div>
               </a>
             </div>

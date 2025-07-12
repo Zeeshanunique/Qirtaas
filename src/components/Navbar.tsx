@@ -58,9 +58,6 @@ export default function Navbar() {
                 <a href={COMMUNITY_LINKS.bookClubEnglish.url} className="text-gray-700 hover:text-secondary px-2 py-1 text-sm block">
                   {COMMUNITY_LINKS.bookClubEnglish.icon} {COMMUNITY_LINKS.bookClubEnglish.label}
                 </a>
-                <a href={COMMUNITY_LINKS.writersCommunity.url} className="text-gray-700 hover:text-secondary px-2 py-1 text-sm block">
-                  {COMMUNITY_LINKS.writersCommunity.icon} {COMMUNITY_LINKS.writersCommunity.label}
-                </a>
               </div>
             </div>
           </div>

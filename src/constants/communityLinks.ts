@@ -1,38 +1,26 @@
 // Community Links Configuration
 // 
-// TO UPDATE LINKS:
-// 1. Replace the '#' placeholder URLs with actual community links
-// 2. The links are used in:
+// These links are used in:
 //    - JoinUsButton component (main dropdown)
 //    - Navbar component (mobile menu)
 //    - Homepage CTA section
 //
-// Example:
-// bookClubUrdu: {
-//   url: 'https://whatsapp.com/channel/YOUR_URDU_BOOK_CLUB_LINK',
-//   label: 'Book Club Urdu',
-//   description: 'اردو کتابی کلب',
-//   icon: '📚'
-// }
+// Currently includes:
+// 1. Book Club Urdu (Instagram)
+// 2. Book Club English (Instagram)
 
 export const COMMUNITY_LINKS = {
   bookClubUrdu: {
-    url: '#', // Replace with actual link
+    url: 'https://ig.me/j/AbbQNDzbKVQoJ3wv/',
     label: 'Book Club Urdu',
     description: 'اردو کتابی کلب',
     icon: '📚'
   },
   bookClubEnglish: {
-    url: '#', // Replace with actual link
+    url: 'https://ig.me/j/AbaVhidrfJXm9mx2/',
     label: 'Book Club English',
     description: 'English Reading Community',
     icon: '📖'
-  },
-  writersCommunity: {
-    url: '#', // Replace with actual link
-    label: "Writer's Community",
-    description: 'Connect with fellow writers',
-    icon: '✍️'
   }
 } as const
 

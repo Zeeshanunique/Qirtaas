@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server'
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
-// Helper function to convert string to ArrayBuffer
-function stringToArrayBuffer(str: string): ArrayBuffer {
+// Helper function to convert string to Uint8Array
+function stringToUint8Array(str: string): Uint8Array {
   const encoder = new TextEncoder()
   return encoder.encode(str)
 }
@@ -81,7 +81,7 @@ async function generateAccessToken(): Promise<string> {
     )
 
     // Sign the JWT
-    const dataToSign = stringToArrayBuffer(`${encodedHeader}.${encodedPayload}`)
+    const dataToSign = stringToUint8Array(`${encodedHeader}.${encodedPayload}`)
     const signature = await crypto.subtle.sign(
       'RSASSA-PKCS1-v1_5',
       importedKey,

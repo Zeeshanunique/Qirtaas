@@ -7,5 +7,29 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true; // Or implement more specific rules based on your needs
     }
+    
+    // Purchases collection - users can read their own purchases
+    match /purchases/{purchaseId} {
+      allow read: if resource.data.purchaserEmail == request.auth.token.email;
+      allow write: if false; // Only admins can write to purchases (done server-side)
+    }
+    
+    // Submissions collection - allow reading approved submissions
+    match /submissions/{submissionId} {
+      allow read: if resource.data.status == 'approved';
+      allow write: if request.auth != null; // Allow authenticated users to submit
+    }
+    
+    // Blog posts collection - allow reading published posts
+    match /posts/{postId} {
+      allow read: if true; // Allow reading all posts (filtering handled in app)
+      allow write: if request.auth != null; // Allow authenticated users to write (admin check in app)
+    }
+    
+    // Blog comments collection (if separate from posts)
+    match /comments/{commentId} {
+      allow read: if true; // Public comments
+      allow write: if request.auth != null; // Authenticated users can comment
+    }
   }
 }

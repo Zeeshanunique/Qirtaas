@@ -44,6 +44,7 @@ function BooksList({ selectedCategory, searchQuery }: { selectedCategory: string
   const [books, setBooks] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({})
+  const [userPurchases, setUserPurchases] = useState<Set<string>>(new Set())
   const searchParams = useSearchParams()
   const router = useRouter()
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
@@ -80,6 +81,32 @@ function BooksList({ selectedCategory, searchQuery }: { selectedCategory: string
 
     fetchBooks()
   }, [user]) // Add user as dependency to re-run when auth state changes
+
+  // Fetch user's purchases
+  useEffect(() => {
+    const fetchUserPurchases = async () => {
+      if (!user) {
+        setUserPurchases(new Set())
+        return
+      }
+
+      try {
+        const q = query(
+          collection(db, 'purchases'),
+          where('purchaserEmail', '==', user.email?.toLowerCase())
+        )
+        const querySnapshot = await getDocs(q)
+        const purchasedSubmissionIds = new Set(
+          querySnapshot.docs.map(doc => doc.data().submissionId)
+        )
+        setUserPurchases(purchasedSubmissionIds)
+      } catch (error) {
+        console.error('Error fetching user purchases:', error)
+      }
+    }
+
+    fetchUserPurchases()
+  }, [user])
 
   useEffect(() => {
     const bookId = searchParams.get('bookId')
@@ -188,11 +215,11 @@ function BooksList({ selectedCategory, searchQuery }: { selectedCategory: string
                     <span className="flex items-center">
                       {typeof book.price === 'string' || typeof book.price === 'number' ? book.price : ''} INR
                       <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                        book.paymentStatus === 'verified' 
+                        userPurchases.has(book.id) 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {book.paymentStatus === 'verified' ? 'Verified' : 'Payment Required'}
+                        {userPurchases.has(book.id) ? 'Purchased' : 'Purchase Required'}
                       </span>
                     </span>
                   ) : (
@@ -210,7 +237,7 @@ function BooksList({ selectedCategory, searchQuery }: { selectedCategory: string
                       >
                         Buy Now
                       </a>
-                      {book.paymentStatus === 'verified' ? (
+                      {userPurchases.has(book.id) ? (
                         <a
                           href={book.fileUrl}
                           target="_blank"
@@ -224,7 +251,7 @@ function BooksList({ selectedCategory, searchQuery }: { selectedCategory: string
                           disabled
                           className="bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
                         >
-                          Payment Pending
+                          Purchase Required
                         </button>
                       )}
                     </>

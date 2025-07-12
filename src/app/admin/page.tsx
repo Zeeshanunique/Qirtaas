@@ -6,7 +6,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { collection, query, getDocs, doc, updateDoc, orderBy, deleteDoc, addDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { isAdmin } from '@/utils/adminAuth'
-import { FaCalendar, FaMapMarkerAlt, FaClock, FaTrash, FaEdit, FaPlus } from 'react-icons/fa'
+import { FaCalendar, FaMapMarkerAlt, FaClock, FaTrash, FaEdit, FaPlus, FaBlog, FaEye, FaComment } from 'react-icons/fa'
+import { BlogPost, BlogFormData, BlogCategory, BlogTag } from '@/types/blog'
 
 interface Submission {
   id: string
@@ -23,6 +24,9 @@ interface Submission {
   paymentStatus: 'pending' | 'verified' | 'none'
   paymentVerifiedAt?: string
   paymentVerifiedBy?: string
+  // Add field to track who the payment is for
+  purchaserEmail?: string
+  purchaserUid?: string
 }
 
 interface Event {
@@ -58,7 +62,7 @@ interface EventFormData {
 export default function AdminDashboard() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'submissions' | 'events'>('submissions')
+  const [activeTab, setActiveTab] = useState<'submissions' | 'events' | 'blog'>('submissions')
   
   // Submissions state
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -91,6 +95,29 @@ export default function AdminDashboard() {
   const [eventSuccess, setEventSuccess] = useState('')
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Blog state
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([])
+  const [isAddingPost, setIsAddingPost] = useState(false)
+  const [isEditingPost, setIsEditingPost] = useState(false)
+  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null)
+  const [blogLoading, setBlogLoading] = useState(false)
+  const [blogFormData, setBlogFormData] = useState<BlogFormData>({
+    title: '',
+    content: '',
+    excerpt: '',
+    slug: '',
+    status: 'draft',
+    categories: [],
+    tags: [],
+    featuredImage: '',
+    isCommentEnabled: true,
+    metaDescription: '',
+    publishDate: ''
+  })
+  const [blogFilter, setBlogFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all')
+  const [blogCategories, setBlogCategories] = useState<BlogCategory[]>([])
+  const [blogTags, setBlogTags] = useState<BlogTag[]>([])
 
   // Variable declarations for fileUrl instead of directLink
   let fileId = '';
@@ -147,21 +174,87 @@ export default function AdminDashboard() {
     }
   }, [user, activeTab])
 
+  // Fetch blog posts
+  const fetchBlogPosts = async () => {
+    try {
+      setBlogLoading(true)
+      const q = query(
+        collection(db, 'posts'),
+        orderBy('createdAt', 'desc')
+      )
+      const querySnapshot = await getDocs(q)
+      const postsData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as BlogPost[]
+      setBlogPosts(postsData)
+    } catch (error) {
+      console.error('Error fetching blog posts:', error)
+    } finally {
+      setBlogLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (user && isAdmin(user.email) && activeTab === 'blog') {
+      fetchBlogPosts()
+    }
+  }, [user, activeTab])
+
+  // Sync content editor when editing existing posts or creating new ones
+  useEffect(() => {
+    const editor = document.getElementById('content-editor') as HTMLDivElement;
+    if (editor && !editor.contains(document.activeElement)) {
+      // Only sync if editor is not focused (not being actively edited)
+      if (isEditingPost && selectedPost) {
+        // Editing existing post - only set content if it's different and editor is not focused
+        if (editor.innerHTML !== blogFormData.content && document.activeElement !== editor) {
+          editor.innerHTML = blogFormData.content || '';
+        }
+      } else if (isAddingPost && !isEditingPost) {
+        // Creating new post - only clear if editor is not focused
+        if (document.activeElement !== editor) {
+          editor.innerHTML = '';
+          setBlogFormData(prev => ({ ...prev, content: '' }));
+        }
+      }
+    }
+  }, [isEditingPost, selectedPost, isAddingPost])
+
   // Handle payment verification
-  const handleVerifyPayment = async (submissionId: string) => {
+  const handleVerifyPayment = async (submissionId: string, purchaserEmail: string) => {
+    if (!purchaserEmail) {
+      alert('Please specify the purchaser email address')
+      return
+    }
+
     try {
       setUpdateLoading(true)
+      
+      // Create user-specific purchase record
+      const purchaseData = {
+        submissionId,
+        purchaserEmail: purchaserEmail.toLowerCase(),
+        purchasedAt: new Date().toISOString(),
+        verifiedBy: user?.email,
+        bookTitle: submissions.find(s => s.id === submissionId)?.title || 'Unknown'
+      }
+
+      await addDoc(collection(db, 'purchases'), purchaseData)
+
+      // Update submission to mark payment as verified but don't make it globally accessible
       const submissionRef = doc(db, 'submissions', submissionId)
       await updateDoc(submissionRef, {
         paymentStatus: 'verified',
         paymentVerifiedAt: new Date().toISOString(),
-        paymentVerifiedBy: user?.email
+        paymentVerifiedBy: user?.email,
+        purchaserEmail: purchaserEmail.toLowerCase()
       })
 
       setSubmissions(prev => 
         prev.map(sub => 
           sub.id === submissionId 
-            ? { ...sub, paymentStatus: 'verified' } 
+            ? { ...sub, paymentStatus: 'verified', purchaserEmail: purchaserEmail.toLowerCase() } 
             : sub
         )
       )
@@ -769,6 +862,152 @@ export default function AdminDashboard() {
     return url
   }
 
+  // Blog management functions
+  const generateSlug = (title: string): string => {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '')
+  }
+
+  const handleBlogFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setBlogFormData(prev => {
+      const updated = { ...prev, [name]: value }
+      // Auto-generate slug from title
+      if (name === 'title') {
+        updated.slug = generateSlug(value)
+      }
+      return updated
+    })
+  }
+
+  const handleAddBlogPost = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate required fields
+    if (!blogFormData.title || !blogFormData.content) {
+      setError('Title and content are required')
+      return
+    }
+
+    try {
+      setBlogLoading(true)
+      const now = new Date().toISOString()
+      
+      // Ensure slug is properly generated
+      const finalSlug = blogFormData.slug || generateSlug(blogFormData.title)
+      
+      const postData: Partial<BlogPost> = {
+        title: blogFormData.title,
+        content: blogFormData.content,
+        excerpt: blogFormData.excerpt,
+        slug: finalSlug,
+        status: blogFormData.status,
+        categories: blogFormData.categories || [],
+        tags: blogFormData.tags || [],
+        featuredImage: blogFormData.featuredImage || '',
+        isCommentEnabled: blogFormData.isCommentEnabled,
+        metaDescription: blogFormData.metaDescription || '',
+        publishDate: blogFormData.publishDate || '',
+        authorId: user?.uid || '',
+        authorName: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
+        authorEmail: user?.email || '',
+        createdAt: now,
+        updatedAt: now,
+        viewCount: 0,
+        comments: []
+      }
+
+      // Only include publishedAt if the post is published
+      if (blogFormData.status === 'published') {
+        postData.publishedAt = blogFormData.publishDate || now
+      }
+
+      if (isEditingPost && selectedPost) {
+        // Update existing post
+        const postRef = doc(db, 'posts', selectedPost.id)
+        await updateDoc(postRef, {
+          ...postData,
+          updatedAt: now
+        })
+        setBlogPosts(prev => prev.map(post => 
+          post.id === selectedPost.id 
+            ? { ...post, ...postData, updatedAt: now } as BlogPost
+            : post
+        ))
+      } else {
+        // Create new post
+        const docRef = await addDoc(collection(db, 'posts'), postData)
+        setBlogPosts(prev => [{ id: docRef.id, ...postData } as BlogPost, ...prev])
+      }
+
+      handleCancelBlogForm()
+    } catch (error) {
+      console.error('Error saving blog post:', error)
+      setError('Failed to save blog post')
+    } finally {
+      setBlogLoading(false)
+    }
+  }
+
+  const handleEditBlogPost = (post: BlogPost) => {
+    setSelectedPost(post)
+    setBlogFormData({
+      title: post.title,
+      content: post.content,
+      excerpt: post.excerpt,
+      slug: post.slug,
+      status: post.status,
+      categories: post.categories,
+      tags: post.tags,
+      featuredImage: post.featuredImage || '',
+      isCommentEnabled: post.isCommentEnabled,
+      metaDescription: post.metaDescription || '',
+      publishDate: post.publishDate || ''
+    })
+    setIsEditingPost(true)
+    setIsAddingPost(true)
+  }
+
+  const handleDeleteBlogPost = async (postId: string) => {
+    if (!window.confirm('Are you sure you want to delete this blog post?')) {
+      return
+    }
+
+    try {
+      setBlogLoading(true)
+      const postRef = doc(db, 'posts', postId)
+      await deleteDoc(postRef)
+      setBlogPosts(prev => prev.filter(post => post.id !== postId))
+    } catch (error) {
+      console.error('Error deleting blog post:', error)
+      setError('Failed to delete blog post')
+    } finally {
+      setBlogLoading(false)
+    }
+  }
+
+  const handleCancelBlogForm = () => {
+    setIsAddingPost(false)
+    setIsEditingPost(false)
+    setSelectedPost(null)
+    setBlogFormData({
+      title: '',
+      content: '',
+      excerpt: '',
+      slug: '',
+      status: 'draft',
+      categories: [],
+      tags: [],
+      featuredImage: '',
+      isCommentEnabled: true,
+      metaDescription: '',
+      publishDate: ''
+    })
+    setError('')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -813,6 +1052,17 @@ export default function AdminDashboard() {
                 }`}
               >
                 Events
+              </button>
+              <button
+                onClick={() => setActiveTab('blog')}
+                className={`py-4 px-6 font-medium text-sm ${
+                  activeTab === 'blog'
+                    ? 'border-b-2 border-primary text-primary'
+                    : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <FaBlog className="inline mr-2" />
+                Blog
               </button>
             </nav>
           </div>
@@ -895,6 +1145,11 @@ export default function AdminDashboard() {
                                   'bg-gray-100 text-gray-800'}`}>
                                 {submission.paymentStatus}
                               </span>
+                              {submission.paymentStatus === 'verified' && submission.purchaserEmail && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Purchased by: {submission.purchaserEmail}
+                                </div>
+                              )}
                             </>
                           ) : (
                             <span className="text-green-600">Free</span>
@@ -914,7 +1169,12 @@ export default function AdminDashboard() {
                           </button>
                           {submission.isPaid && submission.paymentStatus === 'pending' && (
                             <button
-                              onClick={() => handleVerifyPayment(submission.id)}
+                              onClick={() => {
+                                const purchaserEmail = prompt('Enter the purchaser\'s email address:')
+                                if (purchaserEmail) {
+                                  handleVerifyPayment(submission.id, purchaserEmail)
+                                }
+                              }}
                               disabled={updateLoading}
                               className="text-green-600 hover:text-green-900"
                             >
@@ -1417,6 +1677,839 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'blog' && (
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-primary">Blog Management</h2>
+              {!isAddingPost && (
+                <button
+                  onClick={() => setIsAddingPost(true)}
+                  className="flex items-center bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition duration-300"
+                >
+                  <FaPlus className="mr-2" /> Add New Post
+                </button>
+              )}
+            </div>
+
+            {error && (
+              <div className="mb-4 bg-red-100 text-red-700 p-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            {isAddingPost ? (
+              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                <div className="border-b border-gray-200 px-6 py-4">
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {isEditingPost ? 'Edit Post' : 'Add New Post'}
+                  </h3>
+                </div>
+                
+                <form onSubmit={handleAddBlogPost} className="flex flex-col lg:flex-row">
+                  {/* Main Content Area */}
+                  <div className="flex-1 p-6 space-y-6">
+                    {/* Title */}
+                    <div>
+                      <input
+                        type="text"
+                        id="title"
+                        name="title"
+                        value={blogFormData.title}
+                        onChange={handleBlogFormChange}
+                        className="w-full text-2xl font-bold border-none outline-none placeholder-gray-400 focus:ring-0 p-0"
+                        placeholder="Enter post title here..."
+                        required
+                      />
+                      <div className="text-sm text-gray-500 mt-1">
+                        Permalink: <span className="text-primary">/blog/{blogFormData.slug || 'post-slug'}</span>
+                      </div>
+                    </div>
+
+                    {/* Content Editor */}
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-4 border-b border-gray-200 pb-2">
+                        <span className="text-lg font-medium text-gray-700">Content</span>
+                        <div className="flex space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('bold', false, '');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded font-bold transition-colors"
+                            title="Bold"
+                          >
+                            B
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('italic', false, '');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded italic transition-colors"
+                            title="Italic"
+                          >
+                            I
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const linkUrl = prompt('Enter link URL:');
+                              if (linkUrl) {
+                                document.execCommand('createLink', false, linkUrl);
+                                const editor = document.getElementById('content-editor') as HTMLDivElement;
+                                setBlogFormData(prev => ({
+                                  ...prev,
+                                  content: editor.innerHTML
+                                }));
+                                editor.focus();
+                              }
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Add Link"
+                          >
+                            🔗
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('formatBlock', false, 'h2');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Heading 2"
+                          >
+                            H2
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('formatBlock', false, 'h3');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Heading 3"
+                          >
+                            H3
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('insertUnorderedList', false, '');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Bullet List"
+                          >
+                            •
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('insertOrderedList', false, '');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Numbered List"
+                          >
+                            1.
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('insertHorizontalRule', false, '');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Horizontal Line"
+                          >
+                            ―
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('formatBlock', false, 'blockquote');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Blockquote"
+                          >
+                            "
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('undo', false, '');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Undo"
+                          >
+                            ↶
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              document.execCommand('redo', false, '');
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                              editor.focus();
+                            }}
+                            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                            title="Redo"
+                          >
+                            ↷
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="relative">
+                        <style dangerouslySetInnerHTML={{
+                          __html: `
+                            #content-editor {
+                              background: white;
+                            }
+                            #content-editor:empty:before {
+                              content: attr(data-placeholder);
+                              color: #9ca3af;
+                              font-style: italic;
+                              pointer-events: none;
+                            }
+                            #content-editor:focus:before {
+                              display: none;
+                            }
+                            #content-editor h1 {
+                              font-size: 2rem;
+                              font-weight: bold;
+                              margin: 1rem 0;
+                              color: #1f2937;
+                            }
+                            #content-editor h2 {
+                              font-size: 1.5rem;
+                              font-weight: bold;
+                              margin: 1rem 0;
+                              color: #1f2937;
+                            }
+                            #content-editor h3 {
+                              font-size: 1.25rem;
+                              font-weight: bold;
+                              margin: 0.75rem 0;
+                              color: #1f2937;
+                            }
+                            #content-editor p {
+                              margin: 0.5rem 0;
+                              line-height: 1.6;
+                            }
+                            #content-editor ul, #content-editor ol {
+                              margin: 0.5rem 0;
+                              padding-left: 1.5rem;
+                            }
+                            #content-editor li {
+                              margin: 0.25rem 0;
+                            }
+                            #content-editor a {
+                              color: #3b82f6;
+                              text-decoration: underline;
+                            }
+                            #content-editor a:hover {
+                              color: #1d4ed8;
+                            }
+                            #content-editor strong {
+                              font-weight: bold;
+                            }
+                            #content-editor em {
+                              font-style: italic;
+                            }
+                            #content-editor hr {
+                              border: none;
+                              border-top: 1px solid #e5e7eb;
+                              margin: 1rem 0;
+                            }
+                            #content-editor blockquote {
+                              border-left: 4px solid #e5e7eb;
+                              padding-left: 1rem;
+                              margin: 1rem 0;
+                              font-style: italic;
+                              color: #6b7280;
+                            }
+                          `
+                        }} />
+                        <div
+                          id="content-editor"
+                          contentEditable={true}
+                          suppressContentEditableWarning={true}
+                          onInput={(e) => {
+                            const target = e.target as HTMLDivElement;
+                            setBlogFormData(prev => ({
+                              ...prev,
+                              content: target.innerHTML
+                            }));
+                          }}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            const text = e.clipboardData?.getData('text/plain');
+                            if (text) {
+                              document.execCommand('insertText', false, text);
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            // Handle keyboard shortcuts
+                            if (e.ctrlKey || e.metaKey) {
+                              switch (e.key) {
+                                case 'b':
+                                  e.preventDefault();
+                                  document.execCommand('bold', false, '');
+                                  break;
+                                case 'i':
+                                  e.preventDefault();
+                                  document.execCommand('italic', false, '');
+                                  break;
+                                case 'k':
+                                  e.preventDefault();
+                                  const linkUrl = prompt('Enter link URL:');
+                                  if (linkUrl) {
+                                    document.execCommand('createLink', false, linkUrl);
+                                  }
+                                  break;
+                                case 'z':
+                                  e.preventDefault();
+                                  document.execCommand('undo', false, '');
+                                  break;
+                                case 'y':
+                                  e.preventDefault();
+                                  document.execCommand('redo', false, '');
+                                  break;
+                              }
+                              const editor = document.getElementById('content-editor') as HTMLDivElement;
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: editor.innerHTML
+                              }));
+                            }
+                          }}
+                          onFocus={(e) => {
+                            const target = e.target as HTMLDivElement;
+                            if (target.innerHTML === '' || target.innerHTML === '<br>') {
+                              target.innerHTML = '';
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const target = e.target as HTMLDivElement;
+                            if (target.innerHTML === '' || target.innerHTML === '<br>') {
+                              target.innerHTML = '';
+                              setBlogFormData(prev => ({
+                                ...prev,
+                                content: ''
+                              }));
+                            }
+                          }}
+                          className="w-full min-h-[400px] max-h-[600px] overflow-y-auto rounded-lg border-2 border-gray-300 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 p-4 text-base leading-6 outline-none prose prose-lg max-w-none"
+                          style={{
+                            fontFamily: 'Georgia, serif',
+                            fontSize: '16px',
+                            lineHeight: '1.6',
+                            color: '#1f2937'
+                          }}
+                          data-placeholder={blogFormData.content === '' ? 'Start writing your post content here...' : ''}
+                        />
+                        <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-500 shadow-sm">
+                          {blogFormData.content.replace(/<[^>]*>/g, '').split(' ').filter(word => word.length > 0).length} words
+                        </div>
+                        <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-500 shadow-sm">
+                          WYSIWYG Editor
+                        </div>
+                      </div>
+                      
+                      <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+                        <div className="font-medium text-gray-700 mb-1">💡 Editor Features:</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          <div>
+                            <strong>Formatting:</strong> Bold, Italic, Headings, Lists, Links, Blockquotes
+                          </div>
+                          <div>
+                            <strong>Keyboard Shortcuts:</strong> Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+K (Link), Ctrl+Z (Undo), Ctrl+Y (Redo)
+                          </div>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400">
+                          ✨ This is a live WYSIWYG editor - what you see is what you get!
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Excerpt */}
+                    <div>
+                      <label htmlFor="excerpt" className="block text-sm font-medium text-gray-700 mb-2">
+                        Excerpt
+                      </label>
+                      <textarea
+                        id="excerpt"
+                        name="excerpt"
+                        value={blogFormData.excerpt}
+                        onChange={handleBlogFormChange}
+                        rows={3}
+                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                        placeholder="Write a brief excerpt for your post..."
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Excerpts are optional hand-crafted summaries of your content that can be used in your theme.
+                      </p>
+                    </div>
+
+                    {/* SEO Settings */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">SEO Settings</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label htmlFor="metaDescription" className="block text-sm font-medium text-gray-700 mb-1">
+                            Meta Description
+                          </label>
+                          <textarea
+                            id="metaDescription"
+                            name="metaDescription"
+                            value={blogFormData.metaDescription || ''}
+                            onChange={handleBlogFormChange}
+                            rows={2}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                            placeholder="A brief description for search engines..."
+                            maxLength={160}
+                          />
+                          <div className="text-xs text-gray-500 mt-1">
+                            {(blogFormData.metaDescription || '').length}/160 characters
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sidebar */}
+                  <div className="w-full lg:w-80 bg-gray-50 p-6 space-y-6">
+                    {/* Publish */}
+                    <div className="bg-white rounded-lg shadow p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Publish</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                            Status
+                          </label>
+                          <select
+                            id="status"
+                            name="status"
+                            value={blogFormData.status}
+                            onChange={handleBlogFormChange}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                          >
+                            <option value="draft">Draft</option>
+                            <option value="published">Published</option>
+                            <option value="archived">Archived</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="publishDate" className="block text-sm font-medium text-gray-700 mb-1">
+                            Publish Date
+                          </label>
+                          <input
+                            type="datetime-local"
+                            id="publishDate"
+                            name="publishDate"
+                            value={blogFormData.publishDate || new Date().toISOString().slice(0, 16)}
+                            onChange={handleBlogFormChange}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                          />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="isCommentEnabled"
+                            checked={blogFormData.isCommentEnabled}
+                            onChange={(e) => setBlogFormData(prev => ({ ...prev, isCommentEnabled: e.target.checked }))}
+                            className="rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <label htmlFor="isCommentEnabled" className="text-sm text-gray-700">
+                            Allow comments
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Categories & Tags */}
+                    <div className="bg-white rounded-lg shadow p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Categories & Tags</h4>
+                      <div className="space-y-4">
+                        <div>
+                          <label htmlFor="categories" className="block text-sm font-medium text-gray-700 mb-1">
+                            Categories
+                          </label>
+                          <input
+                            type="text"
+                            id="categories"
+                            name="categories"
+                            value={blogFormData.categories?.join(', ') || ''}
+                            onChange={(e) => setBlogFormData(prev => ({ 
+                              ...prev, 
+                              categories: e.target.value.split(',').map(cat => cat.trim()).filter(cat => cat) 
+                            }))}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                            placeholder="Enter categories separated by commas"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
+                            Tags
+                          </label>
+                          <input
+                            type="text"
+                            id="tags"
+                            name="tags"
+                            value={blogFormData.tags?.join(', ') || ''}
+                            onChange={(e) => setBlogFormData(prev => ({ 
+                              ...prev, 
+                              tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag) 
+                            }))}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                            placeholder="Enter tags separated by commas"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Featured Image */}
+                    <div className="bg-white rounded-lg shadow p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Featured Image</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label htmlFor="featuredImage" className="block text-sm font-medium text-gray-700 mb-1">
+                            Image URL
+                          </label>
+                          <input
+                            type="url"
+                            id="featuredImage"
+                            name="featuredImage"
+                            value={blogFormData.featuredImage}
+                            onChange={handleBlogFormChange}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                            placeholder="https://example.com/image.jpg"
+                          />
+                        </div>
+                        
+                        {blogFormData.featuredImage && (
+                          <div className="mt-2">
+                            <img 
+                              src={blogFormData.featuredImage} 
+                              alt="Featured image preview" 
+                              className="w-full h-32 object-cover rounded-md"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Post Settings */}
+                    <div className="bg-white rounded-lg shadow p-4">
+                      <h4 className="font-medium text-gray-900 mb-3">Post Settings</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label htmlFor="slug" className="block text-sm font-medium text-gray-700 mb-1">
+                            URL Slug
+                          </label>
+                          <input
+                            type="text"
+                            id="slug"
+                            name="slug"
+                            value={blogFormData.slug}
+                            onChange={handleBlogFormChange}
+                            className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary text-sm"
+                            placeholder="post-url-slug"
+                            required
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            This will be used in the URL. Use lowercase letters, numbers, and hyphens only.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="bg-white rounded-lg shadow p-4">
+                      <div className="space-y-3">
+                        <button
+                          type="submit"
+                          disabled={blogLoading}
+                          className="w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50 font-medium"
+                        >
+                          {blogLoading ? 'Saving...' : (isEditingPost ? 'Update Post' : 'Publish Post')}
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBlogFormData({...blogFormData, status: 'draft'});
+                            document.querySelector('form')?.requestSubmit();
+                          }}
+                          disabled={blogLoading}
+                          className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 disabled:opacity-50 font-medium"
+                        >
+                          Save as Draft
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!blogFormData.slug) {
+                              alert('Please add a slug to preview the post');
+                              return;
+                            }
+                            
+                            if (!blogFormData.title || !blogFormData.content) {
+                              alert('Please add a title and content to preview the post');
+                              return;
+                            }
+
+                            try {
+                              setBlogLoading(true);
+                              
+                              // Check if this is a new post or existing post
+                              if (!isEditingPost || !selectedPost) {
+                                // New post - save as draft first
+                                const now = new Date().toISOString();
+                                const postData: any = {
+                                  ...blogFormData,
+                                  status: 'draft', // Force draft status for preview
+                                  authorId: user?.uid || '',
+                                  authorName: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
+                                  authorEmail: user?.email || '',
+                                  createdAt: now,
+                                  updatedAt: now,
+                                  viewCount: 0,
+                                  comments: []
+                                };
+
+                                // Save as draft
+                                const docRef = await addDoc(collection(db, 'posts'), postData);
+                                setBlogPosts(prev => [{ id: docRef.id, ...postData } as BlogPost, ...prev]);
+                                setSelectedPost({ id: docRef.id, ...postData } as BlogPost);
+                                setIsEditingPost(true);
+                                
+                                // Now open preview
+                                window.open(`/blog/${blogFormData.slug}`, '_blank');
+                              } else {
+                                // Existing post - update it first
+                                const now = new Date().toISOString();
+                                const postData: any = {
+                                  ...blogFormData,
+                                  authorId: user?.uid || '',
+                                  authorName: user?.displayName || user?.email?.split('@')[0] || 'Anonymous',
+                                  authorEmail: user?.email || '',
+                                  updatedAt: now,
+                                  viewCount: selectedPost.viewCount || 0,
+                                  comments: selectedPost.comments || []
+                                };
+
+                                // Include publishedAt if the post is published
+                                if (blogFormData.status === 'published') {
+                                  postData.publishedAt = blogFormData.publishDate || selectedPost.publishedAt || now;
+                                }
+
+                                const postRef = doc(db, 'posts', selectedPost.id);
+                                await updateDoc(postRef, {
+                                  ...postData,
+                                  updatedAt: now
+                                });
+                                
+                                setBlogPosts(prev => prev.map(post => 
+                                  post.id === selectedPost.id 
+                                    ? { ...post, ...postData, updatedAt: now } as BlogPost
+                                    : post
+                                ));
+                                
+                                // Now open preview
+                                window.open(`/blog/${blogFormData.slug}`, '_blank');
+                              }
+                            } catch (error) {
+                              console.error('Error saving post for preview:', error);
+                              alert('Failed to save post for preview. Please try again.');
+                            } finally {
+                              setBlogLoading(false);
+                            }
+                          }}
+                          disabled={blogLoading}
+                          className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 disabled:opacity-50 font-medium"
+                        >
+                          {blogLoading ? 'Preparing Preview...' : 'Preview Post'}
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={handleCancelBlogForm}
+                          className="w-full text-gray-500 py-2 px-4 rounded-md hover:text-gray-700 font-medium"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div>
+                <div className="mb-4 flex justify-between items-center">
+                  <select
+                    value={blogFilter}
+                    onChange={(e) => setBlogFilter(e.target.value as typeof blogFilter)}
+                    className="rounded-lg border-gray-300 focus:border-primary focus:ring-primary"
+                  >
+                    <option value="all">All Posts</option>
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead>
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Title
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Author
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Created
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Views
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {blogPosts
+                        .filter(post => blogFilter === 'all' || post.status === blogFilter)
+                        .map((post) => (
+                        <tr key={post.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {post.title}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              /{post.slug}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                              ${post.status === 'published' ? 'bg-green-100 text-green-800' : 
+                                post.status === 'archived' ? 'bg-red-100 text-red-800' : 
+                                'bg-yellow-100 text-yellow-800'}`}>
+                              {post.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">
+                              {post.authorName}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(post.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div className="flex items-center">
+                              <FaEye className="mr-1" />
+                              {post.viewCount}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => handleEditBlogPost(post)}
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                <FaEdit />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBlogPost(post.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                <FaTrash />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

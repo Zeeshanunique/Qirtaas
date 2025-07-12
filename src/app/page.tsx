@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
+import JoinUsButton from '@/components/JoinUsButton'
 
 
 export default function Home() {
@@ -119,6 +120,7 @@ export default function Home() {
               Join our community of writers and readers. Let's bring your story to life.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
+              <JoinUsButton variant="primary" size="lg" />
               <Link href="/events" className="bg-secondary hover:bg-sand text-accent font-bold py-3 px-6 rounded-lg transition duration-300">
                 Join Events
               </Link>

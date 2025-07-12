@@ -1,11 +1,14 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { getGoogleDriveImageUrl } from '@/utils/imageUtils'
 import BookSocial from './BookSocial'
 import ShareButton from './ShareButton'
 import { Book } from '@/types/book'
+import { useAuth } from '@/contexts/AuthContext'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 interface BookPopupProps {
   book: Book
@@ -13,6 +16,9 @@ interface BookPopupProps {
 }
 
 export default function BookPopup({ book, onClose }: BookPopupProps) {
+  const { user } = useAuth()
+  const [userPurchases, setUserPurchases] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -20,6 +26,32 @@ export default function BookPopup({ book, onClose }: BookPopupProps) {
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
   }, [onClose])
+
+  // Fetch user's purchases
+  useEffect(() => {
+    const fetchUserPurchases = async () => {
+      if (!user) {
+        setUserPurchases(new Set())
+        return
+      }
+
+      try {
+        const q = query(
+          collection(db, 'purchases'),
+          where('purchaserEmail', '==', user.email?.toLowerCase())
+        )
+        const querySnapshot = await getDocs(q)
+        const purchasedSubmissionIds = new Set(
+          querySnapshot.docs.map(doc => doc.data().submissionId)
+        )
+        setUserPurchases(purchasedSubmissionIds)
+      } catch (error) {
+        console.error('Error fetching user purchases:', error)
+      }
+    }
+
+    fetchUserPurchases()
+  }, [user])
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -59,11 +91,11 @@ export default function BookPopup({ book, onClose }: BookPopupProps) {
                     <span className="flex items-center">
                       {typeof book.price === 'string' || typeof book.price === 'number' ? book.price : ''} INR
                       <span className={`ml-2 text-xs px-2 py-1 rounded-full ${
-                        book.paymentStatus === 'verified' 
+                        userPurchases.has(book.id) 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {book.paymentStatus === 'verified' ? 'Verified' : 'Payment Required'}
+                        {userPurchases.has(book.id) ? 'Purchased' : 'Purchase Required'}
                       </span>
                     </span>
                   ) : (
@@ -83,7 +115,7 @@ export default function BookPopup({ book, onClose }: BookPopupProps) {
                     >
                       Buy Now
                     </a>
-                    {book.paymentStatus === 'verified' ? (
+                    {userPurchases.has(book.id) ? (
                       <a
                         href={book.fileUrl}
                         target="_blank"
@@ -97,7 +129,7 @@ export default function BookPopup({ book, onClose }: BookPopupProps) {
                         disabled
                         className="flex-1 bg-gray-400 text-white px-6 py-3 rounded-lg cursor-not-allowed"
                       >
-                        Payment Pending
+                        Purchase Required
                       </button>
                     )}
                   </>

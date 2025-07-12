@@ -1,6 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useState } from 'react'
+import JoinUsButton from './JoinUsButton'
+import { COMMUNITY_LINKS } from '@/constants/communityLinks'
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -12,14 +14,16 @@ export default function Navbar() {
           <Link href="/" className="text-2xl font-playfair font-bold text-primary">
             Qirtaas Publications
           </Link>
-          <div className="hidden md:flex space-x-6">
+          <div className="hidden md:flex items-center space-x-6">
             <Link href="/" className="text-gray-700 hover:text-secondary">Home</Link>
             <Link href="/about" className="text-gray-700 hover:text-secondary">About</Link>
             <Link href="/services" className="text-gray-700 hover:text-secondary">Services</Link>
             <Link href="/books" className="text-gray-700 hover:text-secondary">Books</Link>
+            <Link href="/blog" className="text-gray-700 hover:text-secondary">Blog</Link>
             <Link href="/submit" className="text-gray-700 hover:text-secondary">Submit</Link>
             <Link href="/events" className="text-gray-700 hover:text-secondary">Events</Link>
             <Link href="/contact" className="text-gray-700 hover:text-secondary">Contact</Link>
+            <JoinUsButton variant="secondary" size="sm" />
           </div>
           <button 
             className="md:hidden"
@@ -42,9 +46,22 @@ export default function Navbar() {
               <Link href="/about" className="text-gray-700 hover:text-secondary px-2 py-1">About</Link>
               <Link href="/services" className="text-gray-700 hover:text-secondary px-2 py-1">Services</Link>
               <Link href="/books" className="text-gray-700 hover:text-secondary px-2 py-1">Books</Link>
+              <Link href="/blog" className="text-gray-700 hover:text-secondary px-2 py-1">Blog</Link>
               <Link href="/submit" className="text-gray-700 hover:text-secondary px-2 py-1">Submit</Link>
               <Link href="/events" className="text-gray-700 hover:text-secondary px-2 py-1">Events</Link>
               <Link href="/contact" className="text-gray-700 hover:text-secondary px-2 py-1">Contact</Link>
+              <div className="border-t border-gray-200 pt-2 mt-2">
+                <div className="px-2 py-1 text-sm font-medium text-gray-600">Join Our Communities</div>
+                <a href={COMMUNITY_LINKS.bookClubUrdu.url} className="text-gray-700 hover:text-secondary px-2 py-1 text-sm block">
+                  {COMMUNITY_LINKS.bookClubUrdu.icon} {COMMUNITY_LINKS.bookClubUrdu.label}
+                </a>
+                <a href={COMMUNITY_LINKS.bookClubEnglish.url} className="text-gray-700 hover:text-secondary px-2 py-1 text-sm block">
+                  {COMMUNITY_LINKS.bookClubEnglish.icon} {COMMUNITY_LINKS.bookClubEnglish.label}
+                </a>
+                <a href={COMMUNITY_LINKS.writersCommunity.url} className="text-gray-700 hover:text-secondary px-2 py-1 text-sm block">
+                  {COMMUNITY_LINKS.writersCommunity.icon} {COMMUNITY_LINKS.writersCommunity.label}
+                </a>
+              </div>
             </div>
           </div>
         )}

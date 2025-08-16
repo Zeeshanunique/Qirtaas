@@ -10,19 +10,19 @@ const contactInfo = [
   {
     icon: FaEnvelope,
     title: 'Email',
-    content: 'qirtaas@qirtaas.com',
-    link: 'mailto:qirtaas@qirtaas.com'
+    content: 'qirtaaspublications.sfp@gmail.com',
+    link: 'mailto:qirtaaspublications.sfp@gmail.com'
   },
   {
     icon: FaPhone,
     title: 'Phone',
-    content: '+1 (234) 567-8900',
-    link: 'tel:+12345678900'
+    content: '919470138701',
+    link: 'tel:+919470138701'
   },
   {
     icon: FaMapMarkerAlt,
     title: 'Location',
-    content: 'Dubai, United Arab Emirates',
+    content: 'Ranchi, Jharkhand, India',
     link: '#'
   }
 ]
